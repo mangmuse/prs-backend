@@ -8,8 +8,7 @@ class GuestSessionResponse(BaseModel):
     """POST /auth/guest 응답 - Notion API 명세 기준"""
 
     guest_id: UUID
-    token: str
-    expires_at: datetime
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

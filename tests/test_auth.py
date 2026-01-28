@@ -1,47 +1,54 @@
 import pytest
 from httpx import AsyncClient
 
-from src.auth import service
-
 
 @pytest.mark.asyncio
 async def test_create_guest_session(client: AsyncClient) -> None:
-    """POST /auth/guest - 게스트 세션 생성 성공"""
+    """POST /auth/guest - 게스트 세션 생성 성공, Cookie 설정"""
     response = await client.post("/auth/guest")
-    assert response.status_code == 201
+    assert response.status_code == 200
 
     data = response.json()
     assert "guest_id" in data
-    assert "token" in data
-    assert "expires_at" in data
+    assert "created_at" in data
+    assert "token" not in data
+    assert "expires_at" not in data
 
-    token_data = service.decode_token(data["token"])
-    assert token_data is not None
-    assert token_data.type == "guest"
-    assert token_data.sub == data["guest_id"]
-
-
-@pytest.mark.asyncio
-async def test_create_guest_session_returns_valid_jwt(client: AsyncClient) -> None:
-    """POST /auth/guest - 반환된 토큰이 유효한 JWT"""
-    response = await client.post("/auth/guest")
-    data = response.json()
-
-    token = data["token"]
-    parts = token.split(".")
-    assert len(parts) == 3
+    assert "guest_id" in response.cookies
+    assert response.cookies["guest_id"] == data["guest_id"]
 
 
 @pytest.mark.asyncio
-async def test_guest_session_token_expiration(client: AsyncClient) -> None:
-    """POST /auth/guest - 토큰 만료일이 30일 후"""
-    from datetime import UTC, datetime, timedelta
+async def test_existing_cookie_returns_same_guest(client: AsyncClient) -> None:
+    """POST /auth/guest - 기존 Cookie가 있으면 같은 세션 반환"""
+    response1 = await client.post("/auth/guest")
+    guest_id1 = response1.json()["guest_id"]
 
-    response = await client.post("/auth/guest")
+    response2 = await client.post("/auth/guest", cookies={"guest_id": guest_id1})
+    guest_id2 = response2.json()["guest_id"]
+
+    assert guest_id1 == guest_id2
+    assert response2.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_invalid_cookie_creates_new_guest(client: AsyncClient) -> None:
+    """POST /auth/guest - 유효하지 않은 Cookie는 새 세션 생성"""
+    response = await client.post("/auth/guest", cookies={"guest_id": "invalid-uuid"})
+    assert response.status_code == 200
+
     data = response.json()
+    assert "guest_id" in data
+    assert "guest_id" in response.cookies
 
-    expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
-    now = datetime.now(UTC)
 
-    diff = expires_at - now
-    assert timedelta(days=29) < diff < timedelta(days=31)
+@pytest.mark.asyncio
+async def test_nonexistent_guest_cookie_creates_new_guest(client: AsyncClient) -> None:
+    """POST /auth/guest - DB에 없는 guest_id Cookie는 새 세션 생성"""
+    fake_uuid = "00000000-0000-0000-0000-000000000000"
+    response = await client.post("/auth/guest", cookies={"guest_id": fake_uuid})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["guest_id"] != fake_uuid
+    assert "guest_id" in response.cookies
