@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import ClassVar
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -23,8 +24,14 @@ class Prompt(SQLModel, table=True):
     guest_id: uuid.UUID | None = Field(
         default=None, foreign_key="guests.id", index=True
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
 
 
 class PromptVersion(SQLModel, table=True):
@@ -40,4 +47,7 @@ class PromptVersion(SQLModel, table=True):
     output_schema: OutputSchemaType = Field(default=OutputSchemaType.JSON_OBJECT)
     output_schema_definition: str | None = None
     semantic_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import ClassVar
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column
+from sqlalchemy import Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -40,8 +40,13 @@ class Run(SQLModel, table=True):
     guest_id: uuid.UUID | None = Field(
         default=None, foreign_key="guests.id", index=True
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    completed_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    completed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True))
+    )
 
 
 class RunResult(SQLModel, table=True):
@@ -67,4 +72,7 @@ class RunResult(SQLModel, table=True):
         default=None, sa_column=Column(Vector(1536))
     )
     latency_ms: int | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import ClassVar
 
-from sqlalchemy import Column
+from sqlalchemy import Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -19,8 +19,14 @@ class Dataset(SQLModel, table=True):
     guest_id: uuid.UUID | None = Field(
         default=None, foreign_key="guests.id", index=True
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
 
 
 class DatasetRow(SQLModel, table=True):
@@ -35,4 +41,7 @@ class DatasetRow(SQLModel, table=True):
     logic_constraints: list[LogicConstraint] | None = Field(
         default=None, sa_column=Column(JSONB)
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True)),
+    )
