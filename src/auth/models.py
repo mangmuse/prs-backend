@@ -1,11 +1,12 @@
 import uuid
 from datetime import UTC, datetime
+from typing import ClassVar
 
 from sqlmodel import Field, SQLModel
 
 
 class User(SQLModel, table=True):
-    __tablename__ = "users"
+    __tablename__: ClassVar[str] = "users"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
@@ -16,7 +17,7 @@ class User(SQLModel, table=True):
 
 
 class Guest(SQLModel, table=True):
-    __tablename__ = "guests"
+    __tablename__: ClassVar[str] = "guests"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     session_token: str = Field(unique=True, index=True)

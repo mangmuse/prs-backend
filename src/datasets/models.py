@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import ClassVar
 
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
@@ -9,7 +10,7 @@ from src.common.types import LogicConstraint
 
 
 class Dataset(SQLModel, table=True):
-    __tablename__ = "datasets"
+    __tablename__: ClassVar[str] = "datasets"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(index=True)
@@ -23,7 +24,7 @@ class Dataset(SQLModel, table=True):
 
 
 class DatasetRow(SQLModel, table=True):
-    __tablename__ = "dataset_rows"
+    __tablename__: ClassVar[str] = "dataset_rows"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     dataset_id: uuid.UUID = Field(foreign_key="datasets.id", index=True)

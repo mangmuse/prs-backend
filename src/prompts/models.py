@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
+from typing import ClassVar
 
 from sqlmodel import Field, SQLModel
 
@@ -13,7 +14,7 @@ class OutputSchemaType(str, Enum):
 
 
 class Prompt(SQLModel, table=True):
-    __tablename__ = "prompts"
+    __tablename__: ClassVar[str] = "prompts"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(index=True)
@@ -27,7 +28,7 @@ class Prompt(SQLModel, table=True):
 
 
 class PromptVersion(SQLModel, table=True):
-    __tablename__ = "prompt_versions"
+    __tablename__: ClassVar[str] = "prompt_versions"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     prompt_id: uuid.UUID = Field(foreign_key="prompts.id", index=True)

@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
+from typing import ClassVar
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column
@@ -25,7 +26,7 @@ class ResultStatus(str, Enum):
 
 
 class Run(SQLModel, table=True):
-    __tablename__ = "runs"
+    __tablename__: ClassVar[str] = "runs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     prompt_version_id: uuid.UUID = Field(foreign_key="prompt_versions.id", index=True)
@@ -44,7 +45,7 @@ class Run(SQLModel, table=True):
 
 
 class RunResult(SQLModel, table=True):
-    __tablename__ = "run_results"
+    __tablename__: ClassVar[str] = "run_results"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     run_id: uuid.UUID = Field(foreign_key="runs.id", index=True)

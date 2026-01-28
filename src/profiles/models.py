@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import ClassVar
 
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
@@ -9,7 +10,7 @@ from src.common.types import LogicConstraint
 
 
 class EvaluatorProfile(SQLModel, table=True):
-    __tablename__ = "evaluator_profiles"
+    __tablename__: ClassVar[str] = "evaluator_profiles"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(index=True)
