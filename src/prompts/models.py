@@ -1,52 +1,52 @@
-import uuid
 from datetime import UTC, datetime
 from enum import Enum
 from typing import ClassVar
+from uuid import UUID
 
 from sqlalchemy import Column, DateTime
 from sqlmodel import Field, SQLModel
 
 
 class OutputSchemaType(str, Enum):
-    JSON_OBJECT = "json_object"
-    JSON_ARRAY = "json_array"
-    LABEL = "label"
-    FREEFORM = "freeform"
+    JSON_OBJECT = "JSON Object"
+    JSON_ARRAY = "JSON Array"
+    LABEL = "Label"
+    FREEFORM = "Freeform"
 
 
 class Prompt(SQLModel, table=True):
+    """프롬프트 마스터 - 폴더 역할."""
+
     __tablename__: ClassVar[str] = "prompts"
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     description: str | None = None
-    user_id: uuid.UUID | None = Field(default=None, foreign_key="users.id", index=True)
-    guest_id: uuid.UUID | None = Field(
-        default=None, foreign_key="guests.id", index=True
-    )
+    user_id: int | None = Field(default=None, foreign_key="users.id", index=True)
+    guest_id: UUID | None = Field(default=None, foreign_key="guests.id", index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True)),
-    )
-    updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True)),
     )
 
 
 class PromptVersion(SQLModel, table=True):
+    """프롬프트 버전 - 불변성 유지, 실제 실험체."""
+
     __tablename__: ClassVar[str] = "prompt_versions"
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    prompt_id: uuid.UUID = Field(foreign_key="prompts.id", index=True)
-    version: int = Field(default=1)
+    id: int | None = Field(default=None, primary_key=True)
+    prompt_id: int = Field(foreign_key="prompts.id", index=True)
+    version_number: int = Field(default=1)
     system_instruction: str
     user_template: str
     model: str = Field(default="claude-3-sonnet")
-    temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    temperature: float = Field(default=0.5, ge=0.0, le=2.0)
     output_schema: OutputSchemaType = Field(default=OutputSchemaType.JSON_OBJECT)
-    output_schema_definition: str | None = None
-    semantic_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    base_profile_id: int | None = Field(
+        default=None, foreign_key="evaluator_profiles.id"
+    )
+    memo: str | None = None
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True)),

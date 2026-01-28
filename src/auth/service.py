@@ -10,7 +10,7 @@ settings = get_settings()
 
 
 def create_access_token(
-    subject: UUID,
+    subject: UUID | int,
     token_type: str,
     expires_delta: timedelta | None = None,
 ) -> tuple[str, datetime]:

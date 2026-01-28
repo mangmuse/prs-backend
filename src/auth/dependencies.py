@@ -32,10 +32,9 @@ async def get_current_identity(
         if token_data is None:
             raise UnauthorizedError("Invalid or expired token")
 
-        subject_id = UUID(token_data.sub)
-
         if token_data.type == "user":
-            user_stmt = select(User).where(col(User.id) == subject_id)
+            user_id = int(token_data.sub)
+            user_stmt = select(User).where(col(User.id) == user_id)
             user_result = await session.execute(user_stmt)
             user = user_result.scalar_one_or_none()
             if user:
