@@ -1,36 +1,36 @@
-"""Shared type definitions for the PRS backend."""
+"""PRS 백엔드 공통 타입 정의."""
 
 from typing import TypedDict
 
 
 class HealthResponse(TypedDict):
-    """Health check endpoint response."""
+    """헬스 체크 엔드포인트 응답."""
 
     status: str
     timestamp: str
 
 
 class LogicConstraint(TypedDict, total=False):
-    """Logic constraint definition for dataset rows and evaluator profiles.
+    """데이터셋 행 및 평가 프로필용 로직 제약조건 정의.
 
-    Types:
-    - contains: target string must be present
-    - not_contains: target string must be absent
-    - range: numeric value must be within min/max
-    - regex: must match pattern
-    - max_length: string length limit
+    타입:
+    - contains: 대상 필드에 값이 포함되어야 함
+    - not_contains: 대상 필드에 값이 포함되지 않아야 함
+    - range: 대상 필드의 숫자 값이 min/max 범위 내여야 함
+    - regex: 대상 필드가 패턴과 일치해야 함
+    - max_length: 대상 필드가 값 길이를 초과하지 않아야 함
     """
 
-    type: str  # contains, not_contains, range, regex, max_length
+    type: str
+    target: str
     value: str | int | float
-    field: str | None
     min: float | None
     max: float | None
     pattern: str | None
 
 
 class LogicCheckResult(TypedDict):
-    """Result of a single logic constraint check."""
+    """단일 로직 제약조건 검사 결과."""
 
     constraint_type: str
     passed: bool
@@ -38,10 +38,10 @@ class LogicCheckResult(TypedDict):
 
 
 class ParsedOutput(TypedDict, total=False):
-    """Parsed LLM output structure.
+    """파싱된 LLM 출력 구조.
 
-    The actual structure varies by output_schema type,
-    but common fields are defined here.
+    실제 구조는 output_schema 타입에 따라 다르지만,
+    공통 필드는 여기에 정의됨.
     """
 
     verdict: str | None
