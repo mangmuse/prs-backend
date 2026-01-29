@@ -40,12 +40,9 @@ class PromptVersion(SQLModel, table=True):
     version_number: int = Field(default=1)
     system_instruction: str
     user_template: str
-    model: str = Field(default="claude-3-sonnet")
-    temperature: float = Field(default=0.5, ge=0.0, le=2.0)
+    model: str = Field(default="gpt-4")
+    temperature: float = Field(default=1.0, ge=0.0, le=2.0)
     output_schema: OutputSchemaType = Field(default=OutputSchemaType.JSON_OBJECT)
-    base_profile_id: int | None = Field(
-        default=None, foreign_key="evaluator_profiles.id"
-    )
     memo: str | None = None
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
