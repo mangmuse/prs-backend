@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_DAYS: int = 30
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    OPENAI_API_KEY: str | None = None
 
 
 @lru_cache

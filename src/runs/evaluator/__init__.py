@@ -5,5 +5,6 @@ Format → Semantic → Logic → Pass (fail-fast)
 """
 
 from .format_layer import check_format
+from .semantic_layer import check_semantic
 
-__all__ = ["check_format"]
+__all__ = ["check_format", "check_semantic"]
