@@ -11,6 +11,7 @@ from src.config import get_settings
 from src.datasets.router import router as datasets_router
 from src.profiles.router import router as profiles_router
 from src.prompts.router import router as prompts_router
+from src.runs.router import router as runs_router
 
 settings = get_settings()
 
@@ -36,6 +37,7 @@ app.include_router(auth_router)
 app.include_router(datasets_router)
 app.include_router(profiles_router)
 app.include_router(prompts_router)
+app.include_router(runs_router)
 
 
 @app.get("/health")
