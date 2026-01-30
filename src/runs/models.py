@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from enum import Enum
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
 from sqlalchemy import Column, DateTime
@@ -53,22 +53,22 @@ class RunResult(SQLModel, table=True):
     dataset_row_id: int = Field(foreign_key="dataset_rows.id", index=True)
 
     # 실행 당시 스냅샷 (DatasetRow 수정/삭제 시에도 과거 기록 보존)
-    input_snapshot: dict = Field(sa_column=Column(JSONB))
+    input_snapshot: dict[str, Any] = Field(sa_column=Column(JSONB))
     expected_snapshot: str
-    assembled_prompt: dict = Field(sa_column=Column(JSONB))
+    assembled_prompt: dict[str, Any] = Field(sa_column=Column(JSONB))
 
     raw_output: str
 
     # Layer 1: Format Check
     is_format_passed: bool = Field(default=True)
-    parsed_output: dict | None = Field(default=None, sa_column=Column(JSONB))
+    parsed_output: dict[str, Any] | None = Field(default=None, sa_column=Column(JSONB))
 
     # Layer 2: Semantic Score
     semantic_score: float = Field(default=0.0)
 
     # Layer 3: Logic Results
-    logic_results: dict = Field(default={}, sa_column=Column(JSONB))
+    logic_results: dict[str, Any] = Field(default={}, sa_column=Column(JSONB))
 
     status: ResultStatus = Field(index=True)
 
-    trace: dict | None = Field(default=None, sa_column=Column(JSONB))
+    trace: dict[str, Any] | None = Field(default=None, sa_column=Column(JSONB))

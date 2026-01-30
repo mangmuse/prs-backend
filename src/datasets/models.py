@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
 from sqlalchemy import Column, DateTime
@@ -33,7 +33,7 @@ class DatasetRow(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     dataset_id: int = Field(foreign_key="datasets.id", index=True)
     row_index: int = Field(default=0)
-    input_data: dict = Field(sa_column=Column(JSONB))
+    input_data: dict[str, Any] = Field(sa_column=Column(JSONB))
     expected_output: str
     row_constraints: list[LogicConstraint] | None = Field(
         default=None, sa_column=Column(JSONB)

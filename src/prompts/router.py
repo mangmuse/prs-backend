@@ -46,10 +46,10 @@ async def list_prompts(
     version_subq = (
         select(
             PromptVersion.prompt_id,
-            func.max(PromptVersion.version_number).label("latest_version"),
-            func.count(PromptVersion.id).label("version_count"),
+            func.max(col(PromptVersion.version_number)).label("latest_version"),
+            func.count(col(PromptVersion.id)).label("version_count"),
         )
-        .group_by(PromptVersion.prompt_id)
+        .group_by(col(PromptVersion.prompt_id))
         .subquery()
     )
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -11,7 +12,7 @@ class CreateDatasetRequest(BaseModel):
 
 
 class CreateRowRequest(BaseModel):
-    input_data: dict
+    input_data: dict[str, Any]
     expected_output: str
     row_constraints: list[LogicConstraint] | None = None
     tags: list[str] | None = None
@@ -38,7 +39,7 @@ class DatasetSummary(BaseModel):
 class DatasetRowResponse(BaseModel):
     id: int
     dataset_id: int
-    input_data: dict
+    input_data: dict[str, Any]
     expected_output: str
     row_constraints: list[LogicConstraint] | None
     tags: list[str] | None

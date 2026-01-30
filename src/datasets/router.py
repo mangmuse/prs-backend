@@ -100,7 +100,7 @@ async def get_dataset_detail(
 
     total_pages = (total_count + limit - 1) // limit if total_count > 0 else 1
 
-    assert dataset.id is not None 
+    assert dataset.id is not None
     return schemas.DatasetDetailResponse(
         id=dataset.id,
         name=dataset.name,

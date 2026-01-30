@@ -24,6 +24,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "aiosqlite>=0.22.1",
+    "basedpyright>=1.37.2",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
     "pyright>=1.1.408",
@@ -65,9 +66,12 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 
-[tool.pyright]
+[tool.basedpyright]
 pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
-typeCheckingMode = "basic"
-reportMissingImports = false
+typeCheckingMode = "recommended"
+# SQLModel __tablename__ 재정의 허용
+reportIncompatibleVariableOverride = false
+# FastAPI Depends() 패턴 허용
+reportCallInDefaultInitializer = false

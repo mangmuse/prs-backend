@@ -1,6 +1,17 @@
 """PRS 백엔드 공통 타입 정의."""
 
+from enum import StrEnum
 from typing import TypedDict
+
+
+class ConstraintType(StrEnum):
+    """Logic Layer constraint 타입."""
+
+    CONTAINS = "contains"
+    NOT_CONTAINS = "not_contains"
+    RANGE = "range"
+    REGEX = "regex"
+    MAX_LENGTH = "max_length"
 
 
 class HealthResponse(TypedDict):
