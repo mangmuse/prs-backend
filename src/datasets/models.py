@@ -6,9 +6,6 @@ from sqlalchemy import Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-from src.common.types import LogicConstraint
-
-
 class Dataset(SQLModel, table=True):
     """데이터셋 마스터 - 실험의 '시험 문제' 폴더."""
 
@@ -35,9 +32,6 @@ class DatasetRow(SQLModel, table=True):
     row_index: int = Field(default=0)
     input_data: dict[str, Any] = Field(sa_column=Column(JSONB))
     expected_output: str
-    row_constraints: list[LogicConstraint] | None = Field(
-        default=None, sa_column=Column(JSONB)
-    )
     tags: list[str] | None = Field(default=None, sa_column=Column(JSONB))
     updated_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))

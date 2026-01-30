@@ -141,7 +141,6 @@ async def create_rows(
             row_index=max_index + i + 1,
             input_data=row_data.input_data,
             expected_output=row_data.expected_output,
-            row_constraints=row_data.row_constraints,
             tags=row_data.tags,
         )
         for i, row_data in enumerate(rows_data)

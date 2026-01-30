@@ -3,9 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from src.common.types import LogicConstraint
-
-
 class CreateDatasetRequest(BaseModel):
     name: str
     description: str | None = None
@@ -14,7 +11,6 @@ class CreateDatasetRequest(BaseModel):
 class CreateRowRequest(BaseModel):
     input_data: dict[str, Any]
     expected_output: str
-    row_constraints: list[LogicConstraint] | None = None
     tags: list[str] | None = None
 
 
@@ -41,7 +37,6 @@ class DatasetRowResponse(BaseModel):
     dataset_id: int
     input_data: dict[str, Any]
     expected_output: str
-    row_constraints: list[LogicConstraint] | None
     tags: list[str] | None
 
     model_config = ConfigDict(from_attributes=True)
