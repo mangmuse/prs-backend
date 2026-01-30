@@ -7,5 +7,6 @@ Format → Semantic → Logic → Pass (fail-fast)
 from src.runs.evaluator.format_layer import check_format
 from src.runs.evaluator.logic_layer import check_logic
 from src.runs.evaluator.semantic_layer import check_semantic
+from src.runs.evaluator.waterfall import evaluate_waterfall
 
-__all__ = ["check_format", "check_logic", "check_semantic"]
+__all__ = ["check_format", "check_logic", "check_semantic", "evaluate_waterfall"]
