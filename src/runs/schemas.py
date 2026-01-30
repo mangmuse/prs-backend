@@ -71,6 +71,9 @@ class RunSummaryResponse(BaseModel):
     status: str
     pass_rate: float | None
     avg_semantic: float | None
+    format_pass_rate: float | None
+    semantic_pass_rate: float | None
+    logic_pass_rate: float | None
     total_rows: int
     created_at: datetime
 
@@ -89,6 +92,9 @@ class RunMetrics(BaseModel):
 
     pass_rate: float
     avg_semantic: float
+    format_pass_rate: float
+    semantic_pass_rate: float
+    logic_pass_rate: float
 
 
 class AssembledPrompt(BaseModel):

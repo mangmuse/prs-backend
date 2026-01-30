@@ -159,6 +159,37 @@ async def get_runs_summary(
         .scalar_subquery()
     )
 
+    format_pass_subq = (
+        select(func.count())
+        .where(
+            col(RunResult.run_id) == col(Run.id),
+            col(RunResult.is_format_passed) == True,  # noqa: E712
+        )
+        .correlate(Run)
+        .scalar_subquery()
+    )
+
+    semantic_pass_subq = (
+        select(func.count())
+        .where(
+            col(RunResult.run_id) == col(Run.id),
+            col(RunResult.status) != ResultStatus.FORMAT,
+            col(RunResult.status) != ResultStatus.SEMANTIC,
+        )
+        .correlate(Run)
+        .scalar_subquery()
+    )
+
+    logic_pass_subq = (
+        select(func.count())
+        .where(
+            col(RunResult.run_id) == col(Run.id),
+            col(RunResult.status) == ResultStatus.PASS,
+        )
+        .correlate(Run)
+        .scalar_subquery()
+    )
+
     stmt = (
         select(
             Run,
@@ -169,6 +200,9 @@ async def get_runs_summary(
             pass_count_subq.label("pass_count"),
             total_count_subq.label("total_count"),
             avg_semantic_subq.label("avg_semantic"),
+            format_pass_subq.label("format_pass_count"),
+            semantic_pass_subq.label("semantic_pass_count"),
+            logic_pass_subq.label("logic_pass_count"),
         )
         .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
         .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
@@ -201,6 +235,21 @@ async def get_runs_summary(
                 (row.pass_count / row.total_count * 100) if row.total_count else None
             ),
             avg_semantic=row.avg_semantic,
+            format_pass_rate=(
+                (row.format_pass_count / row.total_count * 100)
+                if row.total_count
+                else None
+            ),
+            semantic_pass_rate=(
+                (row.semantic_pass_count / row.total_count * 100)
+                if row.total_count
+                else None
+            ),
+            logic_pass_rate=(
+                (row.logic_pass_count / row.total_count * 100)
+                if row.total_count
+                else None
+            ),
             total_rows=row.total_count or 0,
             created_at=row.Run.created_at,
         )
@@ -252,6 +301,12 @@ async def get_run_detail(
     total = len(results)
     pass_count = sum(1 for r in results if r.status == ResultStatus.PASS)
     avg_semantic = sum(r.semantic_score for r in results) / total if total else 0.0
+    format_pass_count = sum(1 for r in results if r.is_format_passed)
+    semantic_pass_count = sum(
+        1 for r in results
+        if r.status not in (ResultStatus.FORMAT, ResultStatus.SEMANTIC)
+    )
+    logic_pass_count = pass_count
 
     result_responses: list[RunResultResponse] = []
     for r in results:
@@ -286,6 +341,9 @@ async def get_run_detail(
         metrics=RunMetrics(
             pass_rate=(pass_count / total * 100) if total else 0.0,
             avg_semantic=avg_semantic,
+            format_pass_rate=(format_pass_count / total * 100) if total else 0.0,
+            semantic_pass_rate=(semantic_pass_count / total * 100) if total else 0.0,
+            logic_pass_rate=(logic_pass_count / total * 100) if total else 0.0,
         ),
         results=result_responses,
     )

@@ -2,16 +2,11 @@ import pytest
 from httpx import AsyncClient
 
 
-async def get_guest_cookie(client: AsyncClient) -> dict[str, str]:
-    """게스트 세션 생성 후 쿠키 반환."""
-    response = await client.post("/auth/guest")
-    return {"guest_id": response.json()["guest_id"]}
-
-
 @pytest.mark.asyncio
-async def test_create_profile(client: AsyncClient) -> None:
+async def test_create_profile(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """POST /evaluator-profiles - 프로필 생성 성공."""
-    cookies = await get_guest_cookie(client)
     response = await client.post(
         "/evaluator-profiles",
         json={
@@ -19,7 +14,7 @@ async def test_create_profile(client: AsyncClient) -> None:
             "description": "높은 threshold",
             "semantic_threshold": 0.9,
         },
-        cookies=cookies,
+        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -29,9 +24,10 @@ async def test_create_profile(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_profile_with_constraints(client: AsyncClient) -> None:
+async def test_create_profile_with_constraints(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """POST /evaluator-profiles - 제약조건 포함 프로필 생성."""
-    cookies = await get_guest_cookie(client)
     response = await client.post(
         "/evaluator-profiles",
         json={
@@ -42,7 +38,7 @@ async def test_create_profile_with_constraints(client: AsyncClient) -> None:
                 {"type": "max_length", "value": 500},
             ],
         },
-        cookies=cookies,
+        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -51,24 +47,25 @@ async def test_create_profile_with_constraints(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_profiles(client: AsyncClient) -> None:
+async def test_list_profiles(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """GET /evaluator-profiles - 목록 조회 (constraint_count 포함)."""
-    cookies = await get_guest_cookie(client)
     await client.post(
         "/evaluator-profiles",
         json={
             "name": "프로필1",
             "global_constraints": [{"type": "contains", "value": "test"}],
         },
-        cookies=cookies,
+        cookies=guest_cookies,
     )
     await client.post(
         "/evaluator-profiles",
         json={"name": "프로필2"},
-        cookies=cookies,
+        cookies=guest_cookies,
     )
 
-    response = await client.get("/evaluator-profiles", cookies=cookies)
+    response = await client.get("/evaluator-profiles", cookies=guest_cookies)
 
     assert response.status_code == 200
     data = response.json()
@@ -82,37 +79,39 @@ async def test_list_profiles(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_profile_detail(client: AsyncClient) -> None:
+async def test_get_profile_detail(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """GET /evaluator-profiles/{id} - 상세 조회."""
-    cookies = await get_guest_cookie(client)
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "상세조회용", "semantic_threshold": 0.75},
-        cookies=cookies,
+        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
-    response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=cookies)
+    response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
 
     assert response.status_code == 200
     assert response.json()["name"] == "상세조회용"
 
 
 @pytest.mark.asyncio
-async def test_update_profile(client: AsyncClient) -> None:
+async def test_update_profile(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """PATCH /evaluator-profiles/{id} - 수정."""
-    cookies = await get_guest_cookie(client)
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "수정전"},
-        cookies=cookies,
+        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
     response = await client.patch(
         f"/evaluator-profiles/{profile_id}",
         json={"name": "수정후", "semantic_threshold": 0.8},
-        cookies=cookies,
+        cookies=guest_cookies,
     )
 
     assert response.status_code == 200
@@ -121,20 +120,21 @@ async def test_update_profile(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_profile(client: AsyncClient) -> None:
+async def test_delete_profile(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
     """DELETE /evaluator-profiles/{id} - 삭제."""
-    cookies = await get_guest_cookie(client)
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "삭제용"},
-        cookies=cookies,
+        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
-    response = await client.delete(f"/evaluator-profiles/{profile_id}", cookies=cookies)
+    response = await client.delete(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
     assert response.status_code == 204
 
-    get_response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=cookies)
+    get_response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
     assert get_response.status_code == 404
 
 
