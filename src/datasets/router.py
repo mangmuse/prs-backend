@@ -100,7 +100,7 @@ async def get_dataset_detail(
 
     total_pages = (total_count + limit - 1) // limit if total_count > 0 else 1
 
-    assert dataset.id is not None  # DB에서 조회한 레코드는 항상 id 존재
+    assert dataset.id is not None 
     return schemas.DatasetDetailResponse(
         id=dataset.id,
         name=dataset.name,
