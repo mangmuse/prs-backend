@@ -41,6 +41,7 @@ class VersionSummary(BaseModel):
     version_number: int
     model: str
     memo: str | None
+    user_template: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -257,21 +257,21 @@ async def get_runs_summary(
             profile_name=row.profile_name,
             status=row.Run.status.value,
             pass_rate=(
-                (row.pass_count / row.total_count * 100) if row.total_count else None
+                (row.pass_count / row.total_count) if row.total_count else None
             ),
             avg_semantic=row.avg_semantic,
             format_pass_rate=(
-                (row.format_pass_count / row.total_count * 100)
+                (row.format_pass_count / row.total_count)
                 if row.total_count
                 else None
             ),
             semantic_pass_rate=(
-                (row.semantic_pass_count / row.total_count * 100)
+                (row.semantic_pass_count / row.total_count)
                 if row.total_count
                 else None
             ),
             logic_pass_rate=(
-                (row.logic_pass_count / row.total_count * 100)
+                (row.logic_pass_count / row.total_count)
                 if row.total_count
                 else None
             ),
@@ -364,11 +364,11 @@ async def get_run_detail(
             global_constraints=profile.global_constraints or [],
         ),
         metrics=RunMetrics(
-            pass_rate=(pass_count / total * 100) if total else 0.0,
+            pass_rate=(pass_count / total) if total else 0.0,
             avg_semantic=avg_semantic,
-            format_pass_rate=(format_pass_count / total * 100) if total else 0.0,
-            semantic_pass_rate=(semantic_pass_count / total * 100) if total else 0.0,
-            logic_pass_rate=(logic_pass_count / total * 100) if total else 0.0,
+            format_pass_rate=(format_pass_count / total) if total else 0.0,
+            semantic_pass_rate=(semantic_pass_count / total) if total else 0.0,
+            logic_pass_rate=(logic_pass_count / total) if total else 0.0,
         ),
         results=result_responses,
     )
