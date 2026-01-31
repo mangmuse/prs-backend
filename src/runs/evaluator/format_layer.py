@@ -1,7 +1,17 @@
 import json
+import re
 
 from src.prompts.models import OutputSchemaType
 from src.runs.schemas import FormatCheckResult
+
+
+def _strip_markdown_code_block(text: str) -> str:
+    """Markdown 코드블록 제거 (```json ... ``` → 내용만 추출)."""
+    pattern = r"```(?:json)?\s*([\s\S]*?)```"
+    match = re.search(pattern, text.strip())
+    if match:
+        return match.group(1).strip()
+    return text.strip()
 
 
 def check_format(
@@ -25,7 +35,9 @@ def check_format(
 
 def _check_json_object(raw_output: str) -> FormatCheckResult:
     try:
-        parsed = json.loads(raw_output.strip())
+        # markdown 코드블록 처리
+        cleaned = _strip_markdown_code_block(raw_output)
+        parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
             return FormatCheckResult(passed=True, parsed_output=parsed)
         return FormatCheckResult(
@@ -38,7 +50,9 @@ def _check_json_object(raw_output: str) -> FormatCheckResult:
 
 def _check_json_array(raw_output: str) -> FormatCheckResult:
     try:
-        parsed = json.loads(raw_output.strip())
+        # markdown 코드블록 처리
+        cleaned = _strip_markdown_code_block(raw_output)
+        parsed = json.loads(cleaned)
         if isinstance(parsed, list):
             return FormatCheckResult(passed=True, parsed_output=parsed)
         return FormatCheckResult(
