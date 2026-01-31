@@ -17,6 +17,7 @@ from src.main import app
 from src.common.types import LogicConstraint
 from src.profiles.models import EvaluatorProfile
 from src.prompts.models import OutputSchemaType, Prompt, PromptVersion
+from src.llm.base import LLMClient
 
 # 테스트 DB URL (환경변수 또는 기본값: docker-compose의 PostgreSQL)
 TEST_DATABASE_URL = os.getenv(
@@ -194,3 +195,35 @@ def profile_factory(
             return profile
 
     return _create
+
+
+class MockLLMClient:
+    """테스트용 Mock LLM 클라이언트."""
+
+    def __init__(self, response: str | list[str]):
+        self.responses = [response] if isinstance(response, str) else response
+        self.call_count = 0
+
+    async def generate(
+        self,
+        system_instruction: str,
+        user_message: str,
+        temperature: float = 1.0,
+    ) -> str:
+        if self.call_count < len(self.responses):
+            result = self.responses[self.call_count]
+            self.call_count += 1
+            return result
+        return self.responses[-1]
+
+
+@pytest.fixture
+def mock_llm_response() -> str:
+    """모킹할 LLM 응답 - 테스트에서 오버라이드 가능."""
+    return '{"verdict": "TRUE", "confidence": 0.95}'
+
+
+@pytest.fixture
+def mock_llm_client(mock_llm_response: str) -> MockLLMClient:
+    """MockLLMClient 인스턴스."""
+    return MockLLMClient(mock_llm_response)
