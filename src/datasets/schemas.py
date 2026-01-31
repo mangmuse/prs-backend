@@ -1,55 +1,71 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+from pydantic.alias_generators import to_camel
 
-class CreateDatasetRequest(BaseModel):
+from src.common.schemas import CamelCaseModel
+
+
+class CreateDatasetRequest(CamelCaseModel):
     name: str
     description: str | None = None
 
 
-class CreateRowRequest(BaseModel):
+class CreateRowRequest(CamelCaseModel):
     input_data: dict[str, Any]
     expected_output: str
     tags: list[str] | None = None
 
 
-class CreateDatasetResponse(BaseModel):
+class CreateDatasetResponse(CamelCaseModel):
     id: int
     name: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class DatasetSummary(BaseModel):
+class DatasetSummary(CamelCaseModel):
     id: int
     name: str
     description: str | None
     row_count: int
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class DatasetRowResponse(BaseModel):
+class DatasetRowResponse(CamelCaseModel):
     id: int
     dataset_id: int
     input_data: dict[str, Any]
     expected_output: str
     tags: list[str] | None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class PaginationMeta(BaseModel):
+class PaginationMeta(CamelCaseModel):
     page: int
     limit: int
     total_count: int
     total_pages: int
 
 
-class DatasetDetailResponse(BaseModel):
+class DatasetDetailResponse(CamelCaseModel):
     id: int
     name: str
     description: str | None
@@ -57,5 +73,5 @@ class DatasetDetailResponse(BaseModel):
     pagination: PaginationMeta
 
 
-class CreateRowsResponse(BaseModel):
+class CreateRowsResponse(CamelCaseModel):
     created_count: int

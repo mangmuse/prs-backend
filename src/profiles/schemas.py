@@ -1,25 +1,27 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
+from src.common.schemas import CamelCaseModel
 from src.common.types import LogicConstraint
 
 
-class CreateProfileRequest(BaseModel):
+class CreateProfileRequest(CamelCaseModel):
     name: str
     description: str | None = None
     semantic_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
     global_constraints: list[LogicConstraint] | None = None
 
 
-class UpdateProfileRequest(BaseModel):
+class UpdateProfileRequest(CamelCaseModel):
     name: str | None = None
     description: str | None = None
     semantic_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     global_constraints: list[LogicConstraint] | None = None
 
 
-class ProfileResponse(BaseModel):
+class ProfileResponse(CamelCaseModel):
     id: int
     name: str
     description: str | None
@@ -28,10 +30,14 @@ class ProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class ProfileSummary(BaseModel):
+class ProfileSummary(CamelCaseModel):
     id: int
     name: str
     description: str | None

@@ -21,9 +21,9 @@ async def test_create_run_returns_201_and_running_status(
     response = await client.post(
         "/runs",
         json={
-            "prompt_version_id": version.id,
-            "dataset_id": dataset.id,
-            "profile_id": profile.id,
+            "promptVersionId": version.id,
+            "datasetId": dataset.id,
+            "profileId": profile.id,
         },
         cookies=guest_cookies,
     )
@@ -32,7 +32,7 @@ async def test_create_run_returns_201_and_running_status(
     data = response.json()
     assert data["status"] == "running"
     assert "id" in data
-    assert "created_at" in data
+    assert "createdAt" in data
 
 
 @pytest.mark.asyncio
@@ -50,9 +50,9 @@ async def test_create_run_with_invalid_version_returns_404(
     response = await client.post(
         "/runs",
         json={
-            "prompt_version_id": 99999,
-            "dataset_id": dataset.id,
-            "profile_id": profile.id,
+            "promptVersionId": 99999,
+            "datasetId": dataset.id,
+            "profileId": profile.id,
         },
         cookies=guest_cookies,
     )
@@ -66,7 +66,7 @@ async def test_create_run_with_other_user_resource_returns_404(
 ) -> None:
     """다른 사용자의 리소스로 Run 생성 시 404."""
     guest1_resp = await client.post("/auth/guest")
-    cookies1 = {"guest_id": guest1_resp.json()["guest_id"]}
+    cookies1 = {"guest_id": guest1_resp.json()["guestId"]}
 
     prompt_resp = await client.post(
         "/prompts",
@@ -78,8 +78,8 @@ async def test_create_run_with_other_user_resource_returns_404(
     version_resp = await client.post(
         f"/prompts/{prompt_id}/versions",
         json={
-            "system_instruction": "테스트",
-            "user_template": "{{input}}",
+            "systemInstruction": "테스트",
+            "userTemplate": "{{input}}",
         },
         cookies=cookies1,
     )
@@ -101,14 +101,14 @@ async def test_create_run_with_other_user_resource_returns_404(
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guest_id"]}
+    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
 
     response = await client.post(
         "/runs",
         json={
-            "prompt_version_id": version_id,
-            "dataset_id": dataset_id,
-            "profile_id": profile_id,
+            "promptVersionId": version_id,
+            "datasetId": dataset_id,
+            "profileId": profile_id,
         },
         cookies=cookies2,
     )
@@ -192,12 +192,12 @@ async def test_list_runs_includes_layer_metrics(
     assert len(runs) == 1
 
     run_data = runs[0]
-    assert "format_pass_rate" in run_data
-    assert "semantic_pass_rate" in run_data
-    assert "logic_pass_rate" in run_data
-    assert run_data["format_pass_rate"] == 100.0
-    assert run_data["semantic_pass_rate"] == 100.0
-    assert run_data["logic_pass_rate"] == 100.0
+    assert "formatPassRate" in run_data
+    assert "semanticPassRate" in run_data
+    assert "logicPassRate" in run_data
+    assert run_data["formatPassRate"] == 1.0
+    assert run_data["semanticPassRate"] == 1.0
+    assert run_data["logicPassRate"] == 1.0
 
 
 @pytest.mark.asyncio
@@ -251,9 +251,9 @@ async def test_get_run_detail_includes_layer_metrics(
     data = response.json()
     metrics = data["metrics"]
 
-    assert "format_pass_rate" in metrics
-    assert "semantic_pass_rate" in metrics
-    assert "logic_pass_rate" in metrics
-    assert metrics["format_pass_rate"] == 100.0
-    assert metrics["semantic_pass_rate"] == 100.0
-    assert metrics["logic_pass_rate"] == 100.0
+    assert "formatPassRate" in metrics
+    assert "semanticPassRate" in metrics
+    assert "logicPassRate" in metrics
+    assert metrics["formatPassRate"] == 1.0
+    assert metrics["semanticPassRate"] == 1.0
+    assert metrics["logicPassRate"] == 1.0

@@ -1,24 +1,30 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+from pydantic.alias_generators import to_camel
 
+from src.common.schemas import CamelCaseModel
 from src.prompts.models import OutputSchemaType
 
 
-class CreatePromptRequest(BaseModel):
+class CreatePromptRequest(CamelCaseModel):
     name: str
     description: str | None = None
 
 
-class CreatePromptResponse(BaseModel):
+class CreatePromptResponse(CamelCaseModel):
     id: int
     name: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-class PromptSummary(BaseModel):
+class PromptSummary(CamelCaseModel):
     id: int
     name: str
     description: str | None
@@ -27,7 +33,7 @@ class PromptSummary(BaseModel):
     created_at: datetime
 
 
-class CreateVersionRequest(BaseModel):
+class CreateVersionRequest(CamelCaseModel):
     system_instruction: str
     user_template: str
     model: str = "gpt-4"
@@ -36,7 +42,7 @@ class CreateVersionRequest(BaseModel):
     memo: str | None = None
 
 
-class VersionSummary(BaseModel):
+class VersionSummary(CamelCaseModel):
     id: int
     version_number: int
     model: str
@@ -44,13 +50,14 @@ class VersionSummary(BaseModel):
     user_template: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
-
-
-
-class VersionDetailResponse(BaseModel):
+class VersionDetailResponse(CamelCaseModel):
     id: int
     prompt_id: int
     version_number: int
@@ -62,4 +69,8 @@ class VersionDetailResponse(BaseModel):
     memo: str | None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )

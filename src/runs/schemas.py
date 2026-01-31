@@ -1,38 +1,37 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
-
+from src.common.schemas import CamelCaseModel
 from src.common.types import JsonValue, LogicConstraint
 from src.runs.models import ResultStatus
 
 
-class FormatCheckResult(BaseModel):
+class FormatCheckResult(CamelCaseModel):
     passed: bool
     parsed_output: dict[str, Any] | list[Any] | str | None = None
     error_message: str | None = None
 
 
-class SemanticCheckResult(BaseModel):
+class SemanticCheckResult(CamelCaseModel):
     passed: bool
     semantic_score: float
     error_message: str | None = None
 
 
-class ConstraintResult(BaseModel):
+class ConstraintResult(CamelCaseModel):
     constraint_type: str
     target: str
     passed: bool
     message: str | None = None
 
 
-class LogicLayerResult(BaseModel):
+class LogicLayerResult(CamelCaseModel):
     passed: bool
     results: list[ConstraintResult] = []
     error_message: str | None = None
 
 
-class WaterfallResult(BaseModel):
+class WaterfallResult(CamelCaseModel):
     """Waterfall 평가 최종 결과"""
 
     status: ResultStatus
@@ -41,7 +40,7 @@ class WaterfallResult(BaseModel):
     logic_result: LogicLayerResult | None = None
 
 
-class CreateRunRequest(BaseModel):
+class CreateRunRequest(CamelCaseModel):
     """Run 생성 요청"""
 
     prompt_version_id: int
@@ -49,7 +48,7 @@ class CreateRunRequest(BaseModel):
     profile_id: int
 
 
-class RunCreateResponse(BaseModel):
+class RunCreateResponse(CamelCaseModel):
     """Run 생성 즉시 응답 (BackgroundTask 시작 후)"""
 
     id: int
@@ -57,7 +56,7 @@ class RunCreateResponse(BaseModel):
     created_at: datetime
 
 
-class RunSummaryResponse(BaseModel):
+class RunSummaryResponse(CamelCaseModel):
     """Run 목록 조회용 응답"""
 
     id: int
@@ -78,7 +77,7 @@ class RunSummaryResponse(BaseModel):
     created_at: datetime
 
 
-class ProfileInRun(BaseModel):
+class ProfileInRun(CamelCaseModel):
     """Run 상세 응답에 포함되는 프로필 정보"""
 
     id: int
@@ -87,7 +86,7 @@ class ProfileInRun(BaseModel):
     global_constraints: list[LogicConstraint]
 
 
-class RunMetrics(BaseModel):
+class RunMetrics(CamelCaseModel):
     """Run 메트릭스"""
 
     pass_rate: float
@@ -97,17 +96,18 @@ class RunMetrics(BaseModel):
     logic_pass_rate: float
 
 
-class AssembledPrompt(BaseModel):
+class AssembledPrompt(CamelCaseModel):
     """조립된 프롬프트"""
 
     system_instruction: str
     user_message: str
 
 
-class RunResultResponse(BaseModel):
+class RunResultResponse(CamelCaseModel):
     """개별 RunResult 응답"""
 
     id: int
+    row_index: int
     dataset_row_id: int
     input_snapshot: dict[str, JsonValue]
     expected_snapshot: dict[str, JsonValue] | str | None
@@ -120,10 +120,15 @@ class RunResultResponse(BaseModel):
     parsed_output: dict[str, JsonValue] | None
 
 
-class RunDetailResponse(BaseModel):
+class RunDetailResponse(CamelCaseModel):
     """Run 상세 조회 응답 (GET /runs/{run_id})"""
 
     id: int
+    prompt_name: str
+    version_number: int
+    dataset_name: str
+    status: str
+    created_at: datetime
     profile: ProfileInRun
     metrics: RunMetrics
     results: list[RunResultResponse]

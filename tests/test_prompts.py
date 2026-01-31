@@ -17,14 +17,14 @@ async def test_create_prompt(
     data = response.json()
     assert data["name"] == "팩트체커"
     assert "id" in data
-    assert "created_at" in data
+    assert "createdAt" in data
 
 
 @pytest.mark.asyncio
 async def test_list_prompts_with_version_count(
     client: AsyncClient, guest_cookies: dict[str, str]
 ) -> None:
-    """GET /prompts - 목록 조회, version_count 포함."""
+    """GET /prompts - 목록 조회, versionCount 포함."""
     create_resp = await client.post(
         "/prompts",
         json={"name": "테스트 프롬프트"},
@@ -35,8 +35,8 @@ async def test_list_prompts_with_version_count(
     await client.post(
         f"/prompts/{prompt_id}/versions",
         json={
-            "system_instruction": "당신은 도우미입니다.",
-            "user_template": "{{input}}을 처리하세요.",
+            "systemInstruction": "당신은 도우미입니다.",
+            "userTemplate": "{{input}}을 처리하세요.",
         },
         cookies=guest_cookies,
     )
@@ -48,8 +48,8 @@ async def test_list_prompts_with_version_count(
     assert len(prompts) >= 1
 
     target = next(p for p in prompts if p["id"] == prompt_id)
-    assert target["version_count"] == 1
-    assert target["latest_version"] == 1
+    assert target["versionCount"] == 1
+    assert target["latestVersion"] == 1
 
 
 @pytest.mark.asyncio
@@ -67,26 +67,26 @@ async def test_create_version_auto_increment(
     v1 = await client.post(
         f"/prompts/{prompt_id}/versions",
         json={
-            "system_instruction": "v1 시스템",
-            "user_template": "v1 유저",
+            "systemInstruction": "v1 시스템",
+            "userTemplate": "v1 유저",
             "memo": "첫 버전",
         },
         cookies=guest_cookies,
     )
     assert v1.status_code == 201
-    assert v1.json()["version_number"] == 1
+    assert v1.json()["versionNumber"] == 1
 
     v2 = await client.post(
         f"/prompts/{prompt_id}/versions",
         json={
-            "system_instruction": "v2 시스템",
-            "user_template": "v2 유저",
+            "systemInstruction": "v2 시스템",
+            "userTemplate": "v2 유저",
             "memo": "두번째 버전",
         },
         cookies=guest_cookies,
     )
     assert v2.status_code == 201
-    assert v2.json()["version_number"] == 2
+    assert v2.json()["versionNumber"] == 2
 
 
 @pytest.mark.asyncio
@@ -104,8 +104,8 @@ async def test_get_version_detail(
     ver_resp = await client.post(
         f"/prompts/{prompt_id}/versions",
         json={
-            "system_instruction": "시스템 지시",
-            "user_template": "유저 템플릿",
+            "systemInstruction": "시스템 지시",
+            "userTemplate": "유저 템플릿",
             "model": "gpt-4",
             "temperature": 0.7,
         },
@@ -120,8 +120,8 @@ async def test_get_version_detail(
 
     assert response.status_code == 200
     data = response.json()
-    assert data["system_instruction"] == "시스템 지시"
-    assert data["user_template"] == "유저 템플릿"
+    assert data["systemInstruction"] == "시스템 지시"
+    assert data["userTemplate"] == "유저 템플릿"
     assert data["model"] == "gpt-4"
     assert data["temperature"] == 0.7
 
@@ -142,8 +142,8 @@ async def test_list_versions(
         await client.post(
             f"/prompts/{prompt_id}/versions",
             json={
-                "system_instruction": f"시스템 {i}",
-                "user_template": f"유저 {i}",
+                "systemInstruction": f"시스템 {i}",
+                "userTemplate": f"유저 {i}",
             },
             cookies=guest_cookies,
         )
@@ -153,15 +153,15 @@ async def test_list_versions(
     assert response.status_code == 200
     versions = response.json()
     assert len(versions) == 3
-    assert versions[0]["version_number"] == 3
-    assert versions[2]["version_number"] == 1
+    assert versions[0]["versionNumber"] == 3
+    assert versions[2]["versionNumber"] == 1
 
 
 @pytest.mark.asyncio
 async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None:
     """다른 사용자 프롬프트 접근 시 404."""
     guest1_resp = await client.post("/auth/guest")
-    cookies1 = {"guest_id": guest1_resp.json()["guest_id"]}
+    cookies1 = {"guest_id": guest1_resp.json()["guestId"]}
 
     prompt_resp = await client.post(
         "/prompts",
@@ -172,7 +172,7 @@ async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guest_id"]}
+    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
 
     response = await client.get(f"/prompts/{prompt_id}/versions", cookies=cookies2)
 

@@ -2,15 +2,22 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+from src.common.schemas import CamelCaseModel
 
 
-class GuestSessionResponse(BaseModel):
+class GuestSessionResponse(CamelCaseModel):
     """POST /auth/guest 응답 - Notion API 명세 기준"""
 
     guest_id: UUID
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 class TokenPayload(BaseModel):

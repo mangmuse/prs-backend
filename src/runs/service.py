@@ -289,9 +289,15 @@ async def get_run_detail(
 ) -> RunDetailResponse:
     """Run 상세 조회 (Live Playground용)."""
     stmt = (
-        select(Run)
+        select(
+            Run,
+            col(Prompt.name).label("prompt_name"),
+            col(PromptVersion.version_number).label("version_number"),
+            col(Dataset.name).label("dataset_name"),
+        )
         .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
         .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
+        .join(Dataset, col(Run.dataset_id) == col(Dataset.id))
         .where(col(Run.id) == run_id)
     )
 
@@ -301,10 +307,15 @@ async def get_run_detail(
         stmt = stmt.where(col(Prompt.user_id) == identity.id)
 
     result = await session.execute(stmt)
-    run = result.scalar_one_or_none()
+    row = result.one_or_none()
 
-    if not run:
+    if not row:
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    run = row.Run
+    prompt_name = row.prompt_name
+    version_number = row.version_number
+    dataset_name = row.dataset_name
 
     profile = (
         await session.execute(
@@ -334,11 +345,12 @@ async def get_run_detail(
     logic_pass_count = pass_count
 
     result_responses: list[RunResultResponse] = []
-    for r in results:
+    for idx, r in enumerate(results, 1):
         assert r.id is not None
         result_responses.append(
             RunResultResponse(
                 id=r.id,
+                row_index=idx,
                 dataset_row_id=r.dataset_row_id,
                 input_snapshot=r.input_snapshot,
                 expected_snapshot=r.expected_snapshot,
@@ -357,6 +369,11 @@ async def get_run_detail(
 
     return RunDetailResponse(
         id=run.id,
+        prompt_name=prompt_name,
+        version_number=version_number,
+        dataset_name=dataset_name,
+        status=run.status.value,
+        created_at=run.created_at,
         profile=ProfileInRun(
             id=profile.id,
             name=profile.name,

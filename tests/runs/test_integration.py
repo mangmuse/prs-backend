@@ -69,15 +69,15 @@ async def test_run_성공_플로우_json_object(
     response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
     assert response.status_code == 200
     data = response.json()
-    assert data["metrics"]["pass_rate"] == 100.0
-    assert data["metrics"]["format_pass_rate"] == 100.0
-    assert data["metrics"]["semantic_pass_rate"] == 100.0
+    assert data["metrics"]["passRate"] == 1.0
+    assert data["metrics"]["formatPassRate"] == 1.0
+    assert data["metrics"]["semanticPassRate"] == 1.0
 
     assert len(data["results"]) == 1
     result = data["results"][0]
     assert result["status"] == "pass"
-    assert result["semantic_score"] is not None
-    assert result["semantic_score"] >= 0.7
+    assert result["semanticScore"] is not None
+    assert result["semanticScore"] >= 0.7
 
 
 @pytest.mark.asyncio
@@ -138,12 +138,12 @@ async def test_run_semantic_실패_플로우(
     response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
     assert response.status_code == 200
     data = response.json()
-    assert data["metrics"]["pass_rate"] == 0.0
-    assert data["metrics"]["format_pass_rate"] == 100.0
-    assert data["metrics"]["semantic_pass_rate"] == 0.0
+    assert data["metrics"]["passRate"] == 0.0
+    assert data["metrics"]["formatPassRate"] == 1.0
+    assert data["metrics"]["semanticPassRate"] == 0.0
 
     assert len(data["results"]) == 1
     result = data["results"][0]
     assert result["status"] == "semantic"
-    assert result["semantic_score"] is not None
-    assert result["semantic_score"] < 0.95
+    assert result["semanticScore"] is not None
+    assert result["semanticScore"] < 0.95
