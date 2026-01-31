@@ -60,6 +60,7 @@ class RunSummaryResponse(CamelCaseModel):
     """Run 목록 조회용 응답"""
 
     id: int
+    prompt_id: int
     prompt_version_id: int
     prompt_name: str
     version_number: int
@@ -124,6 +125,10 @@ class RunDetailResponse(CamelCaseModel):
     """Run 상세 조회 응답 (GET /runs/{run_id})"""
 
     id: int
+    prompt_id: int
+    prompt_version_id: int
+    dataset_id: int
+    profile_id: int
     prompt_name: str
     version_number: int
     dataset_name: str
@@ -132,3 +137,27 @@ class RunDetailResponse(CamelCaseModel):
     profile: ProfileInRun
     metrics: RunMetrics
     results: list[RunResultResponse]
+
+
+class RelatedRunResponse(CamelCaseModel):
+    """같은 조합의 다른 버전 Run"""
+
+    id: int
+    version_number: int
+    status: str
+    pass_rate: float | None
+    created_at: datetime
+
+
+class UnexecutedVersionResponse(CamelCaseModel):
+    """아직 실행 안 된 버전"""
+
+    id: int
+    version_number: int
+
+
+class RelatedVersionsResponse(CamelCaseModel):
+    """GET /runs/{id}/related-versions 응답"""
+
+    executed_runs: list[RelatedRunResponse]
+    unexecuted_versions: list[UnexecutedVersionResponse]

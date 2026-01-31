@@ -16,10 +16,13 @@ from src.runs.models import ResultStatus, Run, RunResult, RunStatus
 from src.runs.schemas import (
     AssembledPrompt,
     ProfileInRun,
+    RelatedRunResponse,
+    RelatedVersionsResponse,
     RunDetailResponse,
     RunMetrics,
     RunResultResponse,
     RunSummaryResponse,
+    UnexecutedVersionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,8 +161,13 @@ async def process_run(run_id: int) -> None:
 async def get_runs_summary(
     identity: Guest | User,
     session: AsyncSession,
+    grouped: bool = True,
 ) -> list[RunSummaryResponse]:
-    """사용자의 Run 목록 조회 (집계 포함)."""
+    """사용자의 Run 목록 조회 (집계 포함).
+
+    Args:
+        grouped: True면 같은 조합(prompt_id + dataset_id + profile_id)에서 최신 Run만 반환
+    """
     pass_count_subq = (
         select(func.count())
         .where(
@@ -218,6 +226,7 @@ async def get_runs_summary(
     stmt = (
         select(
             Run,
+            col(Prompt.id).label("prompt_id"),
             PromptVersion.version_number,
             col(Prompt.name).label("prompt_name"),
             col(Dataset.name).label("dataset_name"),
@@ -240,6 +249,19 @@ async def get_runs_summary(
     else:
         stmt = stmt.where(col(Prompt.user_id) == identity.id)
 
+    if grouped:
+        latest_run_ids_subq = (
+            select(func.max(Run.id).label("latest_id"))
+            .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
+            .group_by(
+                col(PromptVersion.prompt_id),
+                col(Run.dataset_id),
+                col(Run.profile_id),
+            )
+            .subquery()
+        )
+        stmt = stmt.where(col(Run.id).in_(select(latest_run_ids_subq.c.latest_id)))
+
     stmt = stmt.order_by(col(Run.created_at).desc())
 
     result = await session.execute(stmt)
@@ -248,6 +270,7 @@ async def get_runs_summary(
     return [
         RunSummaryResponse(
             id=row.Run.id,
+            prompt_id=row.prompt_id,
             prompt_version_id=row.Run.prompt_version_id,
             prompt_name=row.prompt_name,
             version_number=row.version_number,
@@ -291,6 +314,7 @@ async def get_run_detail(
     stmt = (
         select(
             Run,
+            col(Prompt.id).label("prompt_id"),
             col(Prompt.name).label("prompt_name"),
             col(PromptVersion.version_number).label("version_number"),
             col(Dataset.name).label("dataset_name"),
@@ -313,6 +337,7 @@ async def get_run_detail(
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
     run = row.Run
+    prompt_id = row.prompt_id
     prompt_name = row.prompt_name
     version_number = row.version_number
     dataset_name = row.dataset_name
@@ -369,6 +394,10 @@ async def get_run_detail(
 
     return RunDetailResponse(
         id=run.id,
+        prompt_id=prompt_id,
+        prompt_version_id=run.prompt_version_id,
+        dataset_id=run.dataset_id,
+        profile_id=run.profile_id,
         prompt_name=prompt_name,
         version_number=version_number,
         dataset_name=dataset_name,
@@ -388,4 +417,110 @@ async def get_run_detail(
             logic_pass_rate=(logic_pass_count / total) if total else 0.0,
         ),
         results=result_responses,
+    )
+
+
+async def get_related_versions(
+    run_id: int,
+    identity: Guest | User,
+    session: AsyncSession,
+) -> RelatedVersionsResponse:
+    """현재 Run과 같은 조합의 다른 버전 Run들 및 미실행 버전 조회."""
+    run_stmt = (
+        select(
+            Run,
+            col(PromptVersion.prompt_id).label("prompt_id"),
+        )
+        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
+        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
+        .where(col(Run.id) == run_id)
+    )
+
+    if isinstance(identity, Guest):
+        run_stmt = run_stmt.where(col(Prompt.guest_id) == identity.id)
+    else:
+        run_stmt = run_stmt.where(col(Prompt.user_id) == identity.id)
+
+    run_result = await session.execute(run_stmt)
+    run_row = run_result.one_or_none()
+
+    if not run_row:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    current_run = run_row.Run
+    prompt_id = run_row.prompt_id
+    dataset_id = current_run.dataset_id
+    profile_id = current_run.profile_id
+
+    pass_count_subq = (
+        select(func.count())
+        .where(
+            col(RunResult.run_id) == col(Run.id),
+            col(RunResult.status) == ResultStatus.PASS,
+        )
+        .correlate(Run)
+        .scalar_subquery()
+    )
+
+    total_count_subq = (
+        select(func.count())
+        .where(col(RunResult.run_id) == col(Run.id))
+        .correlate(Run)
+        .scalar_subquery()
+    )
+
+    related_runs_stmt = (
+        select(
+            Run,
+            col(PromptVersion.version_number).label("version_number"),
+            pass_count_subq.label("pass_count"),
+            total_count_subq.label("total_count"),
+        )
+        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
+        .where(
+            col(PromptVersion.prompt_id) == prompt_id,
+            col(Run.dataset_id) == dataset_id,
+            col(Run.profile_id) == profile_id,
+        )
+        .order_by(col(PromptVersion.version_number).desc())
+    )
+
+    related_result = await session.execute(related_runs_stmt)
+    related_rows = related_result.all()
+
+    executed_runs = [
+        RelatedRunResponse(
+            id=row.Run.id,
+            version_number=row.version_number,
+            status=row.Run.status.value,
+            pass_rate=(row.pass_count / row.total_count) if row.total_count else None,
+            created_at=row.Run.created_at,
+        )
+        for row in related_rows
+    ]
+
+    executed_version_ids = {
+        row.Run.prompt_version_id for row in related_rows
+    }
+
+    all_versions_stmt = (
+        select(PromptVersion)
+        .where(col(PromptVersion.prompt_id) == prompt_id)
+        .order_by(col(PromptVersion.version_number).desc())
+    )
+    all_versions_result = await session.execute(all_versions_stmt)
+    all_versions = all_versions_result.scalars().all()
+
+    unexecuted_versions = [
+        UnexecutedVersionResponse(
+            id=v.id,
+            version_number=v.version_number,
+        )
+        for v in all_versions
+        if v.id not in executed_version_ids
+    ]
+
+    return RelatedVersionsResponse(
+        executed_runs=executed_runs,
+        unexecuted_versions=unexecuted_versions,
     )

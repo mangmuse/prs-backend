@@ -10,11 +10,17 @@ from src.prompts.dependencies import get_user_prompt_version
 from src.runs.models import Run, RunStatus
 from src.runs.schemas import (
     CreateRunRequest,
+    RelatedVersionsResponse,
     RunCreateResponse,
     RunDetailResponse,
     RunSummaryResponse,
 )
-from src.runs.service import get_run_detail, get_runs_summary, process_run
+from src.runs.service import (
+    get_related_versions,
+    get_run_detail,
+    get_runs_summary,
+    process_run,
+)
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -53,11 +59,12 @@ async def create_run(
 
 @router.get("", response_model=list[RunSummaryResponse])
 async def list_runs(
+    grouped: bool = True,
     identity: Guest | User = Depends(get_current_identity),
     session: AsyncSession = Depends(get_session),
 ) -> list[RunSummaryResponse]:
     """Run 목록 조회."""
-    return await get_runs_summary(identity, session)
+    return await get_runs_summary(identity, session, grouped=grouped)
 
 
 @router.get("/{run_id}", response_model=RunDetailResponse)
@@ -68,3 +75,13 @@ async def get_run(
 ) -> RunDetailResponse:
     """Run 상세 조회."""
     return await get_run_detail(run_id, identity, session)
+
+
+@router.get("/{run_id}/related-versions", response_model=RelatedVersionsResponse)
+async def get_run_related_versions(
+    run_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> RelatedVersionsResponse:
+    """같은 조합의 관련 버전 조회."""
+    return await get_related_versions(run_id, identity, session)
