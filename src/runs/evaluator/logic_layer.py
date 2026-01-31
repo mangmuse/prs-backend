@@ -1,7 +1,10 @@
+import logging
 import re
 
 from src.common.types import ConstraintType, LogicConstraint
 from src.runs.schemas import ConstraintResult, LogicLayerResult
+
+logger = logging.getLogger(__name__)
 
 FieldValue = str | int | float | bool | None
 
@@ -11,7 +14,10 @@ def check_logic(
     constraints: list[LogicConstraint],
 ) -> LogicLayerResult:
     """Logic Layer: constraint 기반 규칙 검증"""
+    logger.debug("Logic 검증 시작 | constraints=%d개", len(constraints))
+
     if not constraints:
+        logger.debug("Logic 검증 생략 | 제약조건 없음")
         return LogicLayerResult(passed=True)
 
     results: list[ConstraintResult] = []
@@ -21,6 +27,7 @@ def check_logic(
         target = constraint.get("target", "")
 
         if target not in parsed_output:
+            logger.debug("Logic 실패 | 필드 '%s' 없음", target)
             results.append(
                 ConstraintResult(
                     constraint_type=constraint_type,
@@ -35,8 +42,16 @@ def check_logic(
         result = _check_constraint(constraint_type, value, constraint)
         result.target = target
         results.append(result)
+        logger.debug(
+            "Logic 제약조건 | type=%s, target=%s, value=%s, passed=%s",
+            constraint_type,
+            target,
+            value,
+            result.passed,
+        )
 
     all_passed = all(r.passed for r in results)
+    logger.debug("Logic 결과 | passed=%s, results=%d개", all_passed, len(results))
     return LogicLayerResult(passed=all_passed, results=results)
 
 

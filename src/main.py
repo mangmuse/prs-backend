@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -12,6 +13,12 @@ from src.datasets.router import router as datasets_router
 from src.profiles.router import router as profiles_router
 from src.prompts.router import router as prompts_router
 from src.runs.router import router as runs_router
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 settings = get_settings()
 

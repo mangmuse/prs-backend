@@ -35,21 +35,32 @@ def assemble_prompt(
     예: "검증할 문장: {{claim}}" + {"claim": "서울은 수도다"}
     → "검증할 문장: 서울은 수도다"
     """
+    logger.debug("프롬프트 조립 시작 | template_len=%d, input_keys=%s", len(user_template), list(input_data.keys()))
+
     result = user_template
     for key, value in input_data.items():
-        result = result.replace(f"{{{{{key}}}}}", str(value))
+        placeholder = f"{{{{{key}}}}}"
+        if placeholder in result:
+            result = result.replace(placeholder, str(value))
+            logger.debug("치환 성공 | key=%s", key)
+        else:
+            logger.warning("치환 실패 | key='%s'가 템플릿에 없음 (사용 가능: %s)", key, placeholder)
+
+    logger.debug("프롬프트 조립 완료 | result_len=%d", len(result))
     return result
 
 
 async def process_run(run_id: int) -> None:
     """BackgroundTask에서 Run 처리."""
+    logger.info("Run 처리 시작 | run_id=%d", run_id)
+
     async with async_session() as session:
         run = (await session.execute(
             select(Run).where(Run.id == run_id)
         )).scalar_one_or_none()
 
         if run is None:
-            logger.error(f"Run {run_id}를 찾을 수 없습니다")
+            logger.error("Run을 찾을 수 없음 | run_id=%d", run_id)
             return
 
         try:
@@ -69,18 +80,30 @@ async def process_run(run_id: int) -> None:
                 select(EvaluatorProfile).where(EvaluatorProfile.id == run.profile_id)
             )).scalar_one()
 
+            logger.info(
+                "Run 설정 로드 완료 | version_id=%d, model=%s, rows=%d, profile=%s, threshold=%.2f",
+                version.id,
+                version.model,
+                len(rows),
+                profile.name,
+                profile.semantic_threshold,
+            )
+
             llm = get_llm_client(version.model)
 
-            for row in rows:
+            for idx, row in enumerate(rows, 1):
                 assert row.id is not None
+                logger.info("Row 처리 시작 | row=%d/%d, row_id=%d", idx, len(rows), row.id)
 
                 user_message = assemble_prompt(version.user_template, row.input_data)
 
+                logger.debug("LLM 호출 시작 | model=%s, temperature=%.1f", version.model, version.temperature)
                 raw_output = await llm.generate(
                     system_instruction=version.system_instruction,
                     user_message=user_message,
                     temperature=version.temperature,
                 )
+                logger.debug("LLM 응답 수신 | output_len=%d", len(raw_output))
 
                 constraints: list[LogicConstraint] = profile.global_constraints or []
 
@@ -120,12 +143,14 @@ async def process_run(run_id: int) -> None:
                     status=eval_result.status,
                 )
                 session.add(result)
+                logger.info("Row 처리 완료 | row=%d/%d, status=%s", idx, len(rows), eval_result.status.value)
 
             run.status = RunStatus.COMPLETED
+            logger.info("Run 완료 | run_id=%d, status=COMPLETED", run_id)
             await session.commit()
 
         except Exception as e:
-            logger.exception(f"Run {run_id} 처리 실패: {e}")
+            logger.exception("Run 처리 실패 | run_id=%d, error=%s", run_id, str(e))
             run.status = RunStatus.FAILED
             await session.commit()
 

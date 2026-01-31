@@ -1,8 +1,11 @@
 import json
+import logging
 import re
 
 from src.prompts.models import OutputSchemaType
 from src.runs.schemas import FormatCheckResult
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_markdown_code_block(text: str) -> str:
@@ -20,16 +23,29 @@ def check_format(
     expected_output: str | None = None,
 ) -> FormatCheckResult:
     """Format Layer: 출력 형식 검증"""
+    logger.debug("Format 검증 시작 | schema=%s", output_schema.value)
 
     if output_schema == OutputSchemaType.JSON_OBJECT:
-        return _check_json_object(raw_output)
+        result = _check_json_object(raw_output)
+        logger.debug("JSON Object 검증 결과 | passed=%s", result.passed)
+        return result
 
     if output_schema == OutputSchemaType.JSON_ARRAY:
-        return _check_json_array(raw_output)
+        result = _check_json_array(raw_output)
+        logger.debug("JSON Array 검증 결과 | passed=%s", result.passed)
+        return result
 
     if output_schema == OutputSchemaType.LABEL:
-        return _check_label(raw_output, expected_output)
+        result = _check_label(raw_output, expected_output)
+        logger.debug(
+            "Label 검증 결과 | passed=%s, raw='%s', expected='%s'",
+            result.passed,
+            raw_output.strip()[:50],
+            expected_output[:50] if expected_output else None,
+        )
+        return result
 
+    logger.debug("Freeform 스키마 | 검증 생략")
     return FormatCheckResult(passed=True, parsed_output=raw_output)
 
 
