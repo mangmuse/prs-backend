@@ -161,3 +161,21 @@ class RelatedVersionsResponse(CamelCaseModel):
 
     executed_runs: list[RelatedRunResponse]
     unexecuted_versions: list[UnexecutedVersionResponse]
+
+
+class RowComparisonData(CamelCaseModel):
+    """개별 row의 비교 데이터 (raw) - category는 FE에서 계산"""
+
+    row_index: int
+    dataset_row_id: int
+    base_status: ResultStatus
+    target_status: ResultStatus
+    base_semantic_score: float
+    target_semantic_score: float
+
+
+class RegressionComparisonResponse(CamelCaseModel):
+    """회귀 분석 API 응답 - raw 데이터 + p_value만 제공"""
+
+    p_value: float
+    row_comparisons: list[RowComparisonData]

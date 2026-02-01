@@ -10,12 +10,14 @@ from src.prompts.dependencies import get_user_prompt_version
 from src.runs.models import Run, RunStatus
 from src.runs.schemas import (
     CreateRunRequest,
+    RegressionComparisonResponse,
     RelatedVersionsResponse,
     RunCreateResponse,
     RunDetailResponse,
     RunSummaryResponse,
 )
 from src.runs.service import (
+    compare_runs,
     get_related_versions,
     get_run_detail,
     get_runs_summary,
@@ -85,3 +87,14 @@ async def get_run_related_versions(
 ) -> RelatedVersionsResponse:
     """같은 조합의 관련 버전 조회."""
     return await get_related_versions(run_id, identity, session)
+
+
+@router.get("/{run_id}/compare/{base_run_id}", response_model=RegressionComparisonResponse)
+async def compare_runs_endpoint(
+    run_id: int,
+    base_run_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> RegressionComparisonResponse:
+    """두 Run 간 회귀 분석."""
+    return await compare_runs(base_run_id, run_id, identity, session)

@@ -13,11 +13,14 @@ from src.profiles.models import EvaluatorProfile
 from src.prompts.models import Prompt, PromptVersion
 from src.runs.evaluator.waterfall import evaluate_waterfall
 from src.runs.models import ResultStatus, Run, RunResult, RunStatus
+from src.runs.regression import calculate_p_value
 from src.runs.schemas import (
     AssembledPrompt,
     ProfileInRun,
+    RegressionComparisonResponse,
     RelatedRunResponse,
     RelatedVersionsResponse,
+    RowComparisonData,
     RunDetailResponse,
     RunMetrics,
     RunResultResponse,
@@ -523,4 +526,84 @@ async def get_related_versions(
     return RelatedVersionsResponse(
         executed_runs=executed_runs,
         unexecuted_versions=unexecuted_versions,
+    )
+
+
+async def _get_run_results_with_auth(
+    run_id: int,
+    identity: Guest | User,
+    session: AsyncSession,
+) -> list[RunResult]:
+    """Run 소유권 검증 후 결과 조회."""
+    stmt = (
+        select(Run)
+        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
+        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
+        .where(col(Run.id) == run_id)
+    )
+
+    if isinstance(identity, Guest):
+        stmt = stmt.where(col(Prompt.guest_id) == identity.id)
+    else:
+        stmt = stmt.where(col(Prompt.user_id) == identity.id)
+
+    result = await session.execute(stmt)
+    run = result.scalar_one_or_none()
+
+    if not run:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    results = (
+        await session.execute(
+            select(RunResult)
+            .where(col(RunResult.run_id) == run_id)
+            .order_by(col(RunResult.dataset_row_id))
+        )
+    ).scalars().all()
+
+    return list(results)
+
+
+async def compare_runs(
+    base_run_id: int,
+    target_run_id: int,
+    identity: Guest | User,
+    session: AsyncSession,
+) -> RegressionComparisonResponse:
+    """두 Run 간 회귀 분석용 raw 데이터 제공."""
+    base_results = await _get_run_results_with_auth(base_run_id, identity, session)
+    target_results = await _get_run_results_with_auth(target_run_id, identity, session)
+
+    base_by_row = {r.dataset_row_id: r for r in base_results}
+    target_by_row = {r.dataset_row_id: r for r in target_results}
+
+    common_row_ids = sorted(set(base_by_row.keys()) & set(target_by_row.keys()))
+
+    row_comparisons: list[RowComparisonData] = []
+    base_scores: list[float] = []
+    target_scores: list[float] = []
+
+    for idx, row_id in enumerate(common_row_ids, 1):
+        base = base_by_row[row_id]
+        target = target_by_row[row_id]
+
+        row_comparisons.append(
+            RowComparisonData(
+                row_index=idx,
+                dataset_row_id=row_id,
+                base_status=base.status,
+                target_status=target.status,
+                base_semantic_score=base.semantic_score,
+                target_semantic_score=target.semantic_score,
+            )
+        )
+
+        base_scores.append(base.semantic_score)
+        target_scores.append(target.semantic_score)
+
+    p_value = calculate_p_value(base_scores, target_scores)
+
+    return RegressionComparisonResponse(
+        p_value=p_value,
+        row_comparisons=row_comparisons,
     )
