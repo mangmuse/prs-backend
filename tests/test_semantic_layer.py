@@ -3,7 +3,6 @@ from unittest.mock import patch
 from src.prompts.models import OutputSchemaType
 from src.runs.evaluator.semantic_layer import check_semantic
 
-
 EMBEDDING_PATH = "src.runs.evaluator.semantic_layer.get_embedding"
 
 

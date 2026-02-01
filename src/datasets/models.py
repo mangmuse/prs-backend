@@ -6,6 +6,7 @@ from sqlalchemy import Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
+
 class Dataset(SQLModel, table=True):
     """데이터셋 마스터 - 실험의 '시험 문제' 폴더."""
 

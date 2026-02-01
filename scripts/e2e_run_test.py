@@ -1,8 +1,9 @@
 """POST /runs E2E 테스트 스크립트."""
 
-import httpx
 import time
 from datetime import datetime
+
+import httpx
 
 BASE_URL = "http://localhost:8000"
 

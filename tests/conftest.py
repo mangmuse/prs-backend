@@ -11,13 +11,12 @@ from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
 
 from src.auth.models import Guest
+from src.common.types import LogicConstraint
 from src.database import get_session
 from src.datasets.models import Dataset, DatasetRow
 from src.main import app
-from src.common.types import LogicConstraint
 from src.profiles.models import EvaluatorProfile
 from src.prompts.models import OutputSchemaType, Prompt, PromptVersion
-from src.llm.base import LLMClient
 
 # 테스트 DB URL (환경변수 또는 기본값: docker-compose의 PostgreSQL)
 TEST_DATABASE_URL = os.getenv(
@@ -206,9 +205,9 @@ class MockLLMClient:
 
     async def generate(
         self,
-        system_instruction: str,
-        user_message: str,
-        temperature: float = 1.0,
+        _system_instruction: str,
+        _user_message: str,
+        _temperature: float = 1.0,
     ) -> str:
         if self.call_count < len(self.responses):
             result = self.responses[self.call_count]

@@ -150,6 +150,7 @@ async def test_list_runs_includes_layer_metrics(
 ) -> None:
     """목록 조회 시 3-layer 통과율 필드 포함."""
     from unittest.mock import AsyncMock, patch
+
     from src.runs.models import Run, RunStatus
     from src.runs.service import process_run
 
@@ -211,6 +212,7 @@ async def test_get_run_detail_includes_layer_metrics(
 ) -> None:
     """상세 조회 시 metrics에 3-layer 통과율 포함."""
     from unittest.mock import AsyncMock, patch
+
     from src.runs.models import Run, RunStatus
     from src.runs.service import process_run
 

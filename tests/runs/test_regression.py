@@ -58,6 +58,7 @@ async def test_compare_runs_returns_row_comparisons(
 ) -> None:
     """두 Run 비교 시 row별 데이터와 p_value 반환."""
     from unittest.mock import AsyncMock, patch
+
     from src.runs.models import Run, RunStatus
     from src.runs.service import process_run
 
