@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
     OPENAI_API_KEY: str | None = None
     GOOGLE_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_PRE_PING: bool = True
+    DB_POOL_RECYCLE: int = 3600
 
 
 @lru_cache

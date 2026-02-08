@@ -205,9 +205,9 @@ class MockLLMClient:
 
     async def generate(
         self,
-        _system_instruction: str,
-        _user_message: str,
-        _temperature: float = 1.0,
+        system_instruction: str,
+        user_message: str,
+        temperature: float = 1.0,
     ) -> str:
         if self.call_count < len(self.responses):
             result = self.responses[self.call_count]

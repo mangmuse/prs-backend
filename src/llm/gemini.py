@@ -2,17 +2,31 @@ from google import genai
 from google.genai import types
 
 from src.config import get_settings
+from src.llm.base import BaseLLMClient
+from src.llm.schemas import ModelInfo
 
 
-class GeminiClient:
+class GeminiClient(BaseLLMClient):
     """Google Gemini LLM 클라이언트."""
+
+    EXCLUDE_PATTERNS = [
+        "gemma",
+        "tts",
+        "computer-use",
+        "deep-research",
+        "image",
+        "robotics",
+        "nano-banana",
+    ]
 
     def __init__(self, model: str = "gemini-2.5-flash"):
         settings = get_settings()
-        if not settings.GOOGLE_API_KEY:
-            raise ValueError("GOOGLE_API_KEY가 설정되지 않았습니다")
+        super().__init__(
+            api_key=settings.GOOGLE_API_KEY,
+            key_name="GOOGLE_API_KEY",
+            model=model,
+        )
         self.client: genai.Client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-        self.model_name: str = model
 
     async def generate(
         self,
@@ -28,6 +42,35 @@ class GeminiClient:
                 temperature=temperature,
             ),
         )
-        if response.text is None:
-            raise ValueError("Gemini 응답이 비어 있습니다")
-        return response.text
+        return self._ensure_response(response.text, "Gemini")
+
+    @staticmethod
+    def _is_text_model(model_id: str, supported_actions: list[str]) -> bool:
+        """텍스트 생성용 모델인지 판단."""
+        if "generateContent" not in supported_actions:
+            return False
+        model_lower = model_id.lower()
+        return not any(p in model_lower for p in GeminiClient.EXCLUDE_PATTERNS)
+
+    def list_models_sync(self) -> list[ModelInfo]:
+        """모델 목록 조회 (동기)."""
+        response = self.client.models.list()
+        models: list[ModelInfo] = []
+        for m in response:
+            name = m.name or ""
+            model_id = name.replace("models/", "")
+            actions = getattr(m, "supported_actions", []) or []
+            if not self._is_text_model(model_id, actions):
+                continue
+            models.append(
+                ModelInfo(
+                    id=f"gemini/{model_id}",
+                    display_name=m.display_name or model_id,
+                    provider="gemini",
+                )
+            )
+        return models
+
+    async def list_models(self) -> list[ModelInfo]:
+        """모델 목록 조회 (async wrapper)."""
+        return self.list_models_sync()

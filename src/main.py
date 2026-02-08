@@ -10,6 +10,7 @@ from src.auth.router import router as auth_router
 from src.common.types import HealthResponse
 from src.config import get_settings
 from src.datasets.router import router as datasets_router
+from src.llm.router import router as llm_router
 from src.profiles.router import router as profiles_router
 from src.prompts.router import router as prompts_router
 from src.runs.router import router as runs_router
@@ -42,6 +43,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(datasets_router)
+app.include_router(llm_router)
 app.include_router(profiles_router)
 app.include_router(prompts_router)
 app.include_router(runs_router)
