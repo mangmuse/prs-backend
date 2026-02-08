@@ -51,14 +51,13 @@ def check_format(
 
 def _check_json_object(raw_output: str) -> FormatCheckResult:
     try:
-        # markdown 코드블록 처리
         cleaned = _strip_markdown_code_block(raw_output)
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
             return FormatCheckResult(passed=True, parsed_output=parsed)
         return FormatCheckResult(
             passed=False,
-            error_message=f"JSON Object가 아닌 {type(parsed).__name__} 타입입니다"
+            error_message=f"JSON Object가 아닌 {type(parsed).__name__} 타입입니다",
         )
     except json.JSONDecodeError as e:
         return FormatCheckResult(passed=False, error_message=f"JSON 파싱 실패: {e}")
@@ -66,14 +65,13 @@ def _check_json_object(raw_output: str) -> FormatCheckResult:
 
 def _check_json_array(raw_output: str) -> FormatCheckResult:
     try:
-        # markdown 코드블록 처리
         cleaned = _strip_markdown_code_block(raw_output)
         parsed = json.loads(cleaned)
         if isinstance(parsed, list):
             return FormatCheckResult(passed=True, parsed_output=parsed)
         return FormatCheckResult(
             passed=False,
-            error_message=f"JSON Array가 아닌 {type(parsed).__name__} 타입입니다"
+            error_message=f"JSON Array가 아닌 {type(parsed).__name__} 타입입니다",
         )
     except json.JSONDecodeError as e:
         return FormatCheckResult(passed=False, error_message=f"JSON 파싱 실패: {e}")
@@ -84,6 +82,5 @@ def _check_label(raw_output: str, expected_output: str | None) -> FormatCheckRes
     if cleaned == expected_output:
         return FormatCheckResult(passed=True, parsed_output=cleaned)
     return FormatCheckResult(
-        passed=False,
-        error_message=f"Label 불일치: '{cleaned}' != '{expected_output}'"
+        passed=False, error_message=f"Label 불일치: '{cleaned}' != '{expected_output}'"
     )

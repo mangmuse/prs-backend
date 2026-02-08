@@ -11,6 +11,7 @@ wheels/
 
 # Environment variables
 .env
+.env.local
 
 # Type checking / linting cache
 .mypy_cache/

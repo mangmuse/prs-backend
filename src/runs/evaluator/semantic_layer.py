@@ -49,7 +49,9 @@ def check_semantic(
     threshold: float,
 ) -> SemanticCheckResult:
     """Semantic Layer: embedding 기반 유사도 검증"""
-    logger.debug("Semantic 검증 시작 | schema=%s, threshold=%.2f", output_schema.value, threshold)
+    logger.debug(
+        "Semantic 검증 시작 | schema=%s, threshold=%.2f", output_schema.value, threshold
+    )
 
     if output_schema == OutputSchemaType.LABEL:
         logger.debug("Label 스키마 | Semantic 검증 생략 (score=1.0)")
@@ -59,7 +61,11 @@ def check_semantic(
         logger.debug("Embedding 요청 중...")
         raw_embedding = get_embedding(raw_output)
         expected_embedding = get_embedding(expected_output)
-        logger.debug("Embedding 완료 | raw_dim=%d, expected_dim=%d", len(raw_embedding), len(expected_embedding))
+        logger.debug(
+            "Embedding 완료 | raw_dim=%d, expected_dim=%d",
+            len(raw_embedding),
+            len(expected_embedding),
+        )
     except Exception as e:
         logger.warning("Embedding API 오류 | error=%s", str(e))
         return SemanticCheckResult(
@@ -71,5 +77,10 @@ def check_semantic(
     score = cosine_similarity(raw_embedding, expected_embedding)
     passed = score >= threshold
 
-    logger.debug("Semantic 결과 | score=%.4f, threshold=%.2f, passed=%s", score, threshold, passed)
+    logger.debug(
+        "Semantic 결과 | score=%.4f, threshold=%.2f, passed=%s",
+        score,
+        threshold,
+        passed,
+    )
     return SemanticCheckResult(passed=passed, semantic_score=score)
