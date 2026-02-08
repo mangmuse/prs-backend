@@ -3,6 +3,8 @@
 import pytest
 from httpx import AsyncClient
 
+from src.runs.models import Run, RunStatus
+
 
 @pytest.mark.asyncio
 async def test_create_run_returns_201_and_running_status(
@@ -152,7 +154,7 @@ async def test_list_runs_includes_layer_metrics(
     from unittest.mock import AsyncMock, patch
 
     from src.runs.models import Run, RunStatus
-    from src.runs.service import process_run
+    from src.runs.service import execute_run
 
     guest_id = guest_cookies["guest_id"]
     _, version = await prompt_factory(guest_id)
@@ -170,6 +172,10 @@ async def test_list_runs_includes_layer_metrics(
             prompt_version_id=version.id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run)
@@ -184,7 +190,7 @@ async def test_list_runs_includes_layer_metrics(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
     ):
-        await process_run(run_id)
+        await execute_run(run_id)
 
     response = await client.get("/runs", cookies=guest_cookies)
 
@@ -195,10 +201,10 @@ async def test_list_runs_includes_layer_metrics(
     run_data = runs[0]
     assert "formatPassRate" in run_data
     assert "semanticPassRate" in run_data
-    assert "logicPassRate" in run_data
+    assert "constraintPassRate" in run_data
     assert run_data["formatPassRate"] == 1.0
     assert run_data["semanticPassRate"] == 1.0
-    assert run_data["logicPassRate"] == 1.0
+    assert run_data["constraintPassRate"] == 1.0
 
 
 @pytest.mark.asyncio
@@ -214,7 +220,7 @@ async def test_get_run_detail_includes_layer_metrics(
     from unittest.mock import AsyncMock, patch
 
     from src.runs.models import Run, RunStatus
-    from src.runs.service import process_run
+    from src.runs.service import execute_run
 
     guest_id = guest_cookies["guest_id"]
     _, version = await prompt_factory(guest_id)
@@ -231,6 +237,10 @@ async def test_get_run_detail_includes_layer_metrics(
             prompt_version_id=version.id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run)
@@ -245,7 +255,7 @@ async def test_get_run_detail_includes_layer_metrics(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
     ):
-        await process_run(run_id)
+        await execute_run(run_id)
 
     response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
 
@@ -255,7 +265,257 @@ async def test_get_run_detail_includes_layer_metrics(
 
     assert "formatPassRate" in metrics
     assert "semanticPassRate" in metrics
-    assert "logicPassRate" in metrics
+    assert "constraintPassRate" in metrics
     assert metrics["formatPassRate"] == 1.0
     assert metrics["semanticPassRate"] == 1.0
-    assert metrics["logicPassRate"] == 1.0
+    assert metrics["constraintPassRate"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_update_profile_snapshot_returns_204(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """profile_snapshot 업데이트 시 204 반환."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id)
+    profile = await profile_factory(guest_id, semantic_threshold=0.7)
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.7,
+                "global_constraints": [],
+            },
+            status=RunStatus.COMPLETED,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+
+    response = await client.patch(
+        f"/runs/{run_id}/profile-snapshot",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [
+                {"type": "contains", "target": "verdict", "value": "TRUE"},
+            ],
+        },
+        cookies=guest_cookies,
+    )
+
+    assert response.status_code == 204
+
+    detail_response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
+    detail = detail_response.json()
+    assert detail["profile"]["semanticThreshold"] == 0.85
+    assert len(detail["profile"]["globalConstraints"]) == 1
+    assert detail["profile"]["globalConstraints"][0]["type"] == "contains"
+
+
+@pytest.mark.asyncio
+async def test_update_profile_snapshot_not_found(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """존재하지 않는 Run의 profile_snapshot 업데이트 시 404."""
+    response = await client.patch(
+        "/runs/99999/profile-snapshot",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [],
+        },
+        cookies=guest_cookies,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_profile_snapshot_other_user_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """다른 사용자의 Run profile_snapshot 업데이트 시 404."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id)
+    profile = await profile_factory(guest_id)
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.7,
+                "global_constraints": [],
+            },
+            status=RunStatus.COMPLETED,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+
+    client.cookies.clear()
+    guest2_resp = await client.post("/auth/guest")
+    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+
+    response = await client.patch(
+        f"/runs/{run_id}/profile-snapshot",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [],
+        },
+        cookies=cookies2,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_returns_200_with_results(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """재평가 요청 시 200과 결과 반환."""
+    from unittest.mock import AsyncMock, patch
+
+    from src.runs.service import execute_run
+
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(
+        guest_id,
+        rows=[
+            {"input": {"claim": "테스트"}, "expected": "TRUE"},
+            {"input": {"claim": "테스트2"}, "expected": "FALSE"},
+        ],
+    )
+    profile = await profile_factory(guest_id, semantic_threshold=0.5)
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.5,
+                "global_constraints": [],
+            },
+            status=RunStatus.RUNNING,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+
+    mock_llm = AsyncMock()
+    mock_llm.generate = AsyncMock(side_effect=["TRUE", "FALSE"])
+
+    with (
+        patch("src.runs.service.async_session", test_session_factory),
+        patch("src.runs.service.get_llm_client", return_value=mock_llm),
+    ):
+        await execute_run(run_id)
+
+    response = await client.post(
+        f"/runs/{run_id}/re-evaluate",
+        json={
+            "semanticThreshold": 0.99,
+            "globalConstraints": [],
+        },
+        cookies=guest_cookies,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "results" in data
+    assert "passRate" in data
+    assert len(data["results"]) == 2
+    for result in data["results"]:
+        assert "id" in result
+        assert "status" in result
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_not_found(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """존재하지 않는 Run 재평가 시 404."""
+    response = await client.post(
+        "/runs/99999/re-evaluate",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [],
+        },
+        cookies=guest_cookies,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_other_user_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """다른 사용자의 Run 재평가 시 404."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id)
+    profile = await profile_factory(guest_id)
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.7,
+                "global_constraints": [],
+            },
+            status=RunStatus.COMPLETED,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+
+    client.cookies.clear()
+    guest2_resp = await client.post("/auth/guest")
+    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+
+    response = await client.post(
+        f"/runs/{run_id}/re-evaluate",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [],
+        },
+        cookies=cookies2,
+    )
+
+    assert response.status_code == 404

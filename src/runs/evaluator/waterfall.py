@@ -98,3 +98,28 @@ def _get_parsed_output(format_result: FormatCheckResult) -> dict[str, FieldValue
     if isinstance(format_result.parsed_output, dict):
         return format_result.parsed_output
     return {}
+
+
+def re_evaluate_from_stored(
+    is_format_passed: bool,
+    parsed_output: dict[str, FieldValue] | None,
+    semantic_score: float,
+    threshold: float,
+    constraints: list[LogicConstraint],
+) -> tuple[ResultStatus, ConstraintLayerResult | None]:
+    """저장된 결과로 재평가 (LLM 호출 없이).
+
+    프로필 값(threshold, constraints) 변경 시 기존 결과를 기반으로 재평가.
+    Layer 1(Format)은 프로필과 무관하므로 저장된 값을 그대로 사용.
+    """
+    if not is_format_passed:
+        return ResultStatus.FORMAT, None
+
+    if semantic_score < threshold:
+        return ResultStatus.SEMANTIC, None
+
+    constraint_result = check_constraints(parsed_output or {}, constraints)
+    if not constraint_result.passed:
+        return ResultStatus.CONSTRAINT, constraint_result
+
+    return ResultStatus.PASS, constraint_result

@@ -7,22 +7,29 @@ from src.database import get_session
 from src.datasets.dependencies import get_user_dataset
 from src.profiles.dependencies import get_user_profile
 from src.prompts.dependencies import get_user_prompt_version
-from src.runs.models import Run, RunStatus
 from src.runs.schemas import (
     CreateRunRequest,
+    ReEvaluateRequest,
+    ReEvaluateResponse,
     RegressionComparisonResponse,
     RelatedVersionsResponse,
     RunCreateResponse,
     RunDetailResponse,
     RunSummaryResponse,
+    UpdateProfileSnapshotRequest,
 )
 from src.runs.service import (
     compare_runs,
     get_related_versions,
     get_run_detail,
     get_runs_summary,
-    process_run,
+    re_evaluate_run,
+    update_run_profile_snapshot,
 )
+from src.runs.service import (
+    create_run as create_run_service,
+)
+from src.runs.tasks import process_run_task
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -39,18 +46,10 @@ async def create_run(
     await get_user_dataset(data.dataset_id, identity, session)
     await get_user_profile(data.profile_id, identity, session)
 
-    run = Run(
-        prompt_version_id=data.prompt_version_id,
-        dataset_id=data.dataset_id,
-        profile_id=data.profile_id,
-        status=RunStatus.RUNNING,
-    )
-    session.add(run)
-    await session.commit()
-    await session.refresh(run)
+    run = await create_run_service(data, session)
 
     assert run.id is not None
-    background_tasks.add_task(process_run, run.id)
+    background_tasks.add_task(process_run_task, run.id)
 
     return RunCreateResponse(
         id=run.id,
@@ -89,7 +88,9 @@ async def get_run_related_versions(
     return await get_related_versions(run_id, identity, session)
 
 
-@router.get("/{run_id}/compare/{base_run_id}", response_model=RegressionComparisonResponse)
+@router.get(
+    "/{run_id}/compare/{base_run_id}", response_model=RegressionComparisonResponse
+)
 async def compare_runs_endpoint(
     run_id: int,
     base_run_id: int,
@@ -98,3 +99,25 @@ async def compare_runs_endpoint(
 ) -> RegressionComparisonResponse:
     """두 Run 간 회귀 분석."""
     return await compare_runs(base_run_id, run_id, identity, session)
+
+
+@router.patch("/{run_id}/profile-snapshot", status_code=204)
+async def update_profile_snapshot(
+    run_id: int,
+    data: UpdateProfileSnapshotRequest,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Run의 profile_snapshot 업데이트."""
+    await update_run_profile_snapshot(run_id, data, identity, session)
+
+
+@router.post("/{run_id}/re-evaluate", response_model=ReEvaluateResponse)
+async def re_evaluate_run_endpoint(
+    run_id: int,
+    data: ReEvaluateRequest,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> ReEvaluateResponse:
+    """프로필 값 변경 시 재평가 미리보기 (DB 변경 없음)."""
+    return await re_evaluate_run(run_id, data, identity, session)

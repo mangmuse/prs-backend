@@ -6,6 +6,13 @@ from src.common.types import JsonValue, LogicConstraint
 from src.runs.models import ResultStatus
 
 
+class ProfileSnapshot(CamelCaseModel):
+    """Run 실행 당시 Profile 스냅샷."""
+
+    semantic_threshold: float
+    global_constraints: list[LogicConstraint]
+
+
 class FormatCheckResult(CamelCaseModel):
     passed: bool
     parsed_output: dict[str, Any] | list[Any] | str | None = None
@@ -46,6 +53,13 @@ class CreateRunRequest(CamelCaseModel):
     prompt_version_id: int
     dataset_id: int
     profile_id: int
+
+
+class UpdateProfileSnapshotRequest(CamelCaseModel):
+    """Run의 profile_snapshot 업데이트 요청."""
+
+    semantic_threshold: float
+    global_constraints: list[LogicConstraint]
 
 
 class RunCreateResponse(CamelCaseModel):
@@ -179,3 +193,25 @@ class RegressionComparisonResponse(CamelCaseModel):
 
     p_value: float
     row_comparisons: list[RowComparisonData]
+
+
+class ReEvaluateRequest(CamelCaseModel):
+    """재평가 요청 (프로필 값 변경 시 미리보기)"""
+
+    semantic_threshold: float
+    global_constraints: list[LogicConstraint]
+
+
+class ReEvaluatedRow(CamelCaseModel):
+    """재평가된 개별 row 결과"""
+
+    id: int
+    status: ResultStatus
+    constraint_results: dict[str, JsonValue] | None
+
+
+class ReEvaluateResponse(CamelCaseModel):
+    """재평가 응답"""
+
+    results: list[ReEvaluatedRow]
+    pass_rate: float
