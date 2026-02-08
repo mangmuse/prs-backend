@@ -60,7 +60,7 @@ async def test_compare_runs_returns_row_comparisons(
     from unittest.mock import AsyncMock, patch
 
     from src.runs.models import Run, RunStatus
-    from src.runs.service import process_run
+    from src.runs.service import execute_run
 
     guest_id = guest_cookies["guest_id"]
     prompt, version1 = await prompt_factory(guest_id)
@@ -78,6 +78,10 @@ async def test_compare_runs_returns_row_comparisons(
             prompt_version_id=version1.id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run1)
@@ -92,7 +96,7 @@ async def test_compare_runs_returns_row_comparisons(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm1),
     ):
-        await process_run(run1_id)
+        await execute_run(run1_id)
 
     version2_resp = await client.post(
         f"/prompts/{prompt.id}/versions",
@@ -109,6 +113,10 @@ async def test_compare_runs_returns_row_comparisons(
             prompt_version_id=version2_id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run2)
@@ -123,7 +131,7 @@ async def test_compare_runs_returns_row_comparisons(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm2),
     ):
-        await process_run(run2_id)
+        await execute_run(run2_id)
 
     response = await client.get(
         f"/runs/{run2_id}/compare/{run1_id}",

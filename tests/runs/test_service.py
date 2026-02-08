@@ -6,7 +6,7 @@ import pytest
 
 from src.prompts.models import OutputSchemaType
 from src.runs.models import ResultStatus, Run, RunResult, RunStatus
-from src.runs.service import assemble_prompt, process_run
+from src.runs.service import assemble_prompt, execute_run
 
 
 class TestAssemblePrompt:
@@ -88,6 +88,10 @@ class TestProcessRun:
                 prompt_version_id=version.id,
                 dataset_id=dataset.id,
                 profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
                 status=RunStatus.RUNNING,
             )
             session.add(run)
@@ -102,7 +106,7 @@ class TestProcessRun:
             patch("src.runs.service.async_session", test_session_factory),
             patch("src.runs.service.get_llm_client", return_value=mock_llm),
         ):
-            await process_run(run_id)
+            await execute_run(run_id)
 
         async with test_session_factory() as session:
             from sqlmodel import select
@@ -155,6 +159,10 @@ class TestProcessRun:
                 prompt_version_id=version.id,
                 dataset_id=dataset.id,
                 profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
                 status=RunStatus.RUNNING,
             )
             session.add(run)
@@ -169,7 +177,7 @@ class TestProcessRun:
             patch("src.runs.service.async_session", test_session_factory),
             patch("src.runs.service.get_llm_client", return_value=mock_llm),
         ):
-            await process_run(run_id)
+            await execute_run(run_id)
 
         async with test_session_factory() as session:
             from sqlmodel import select
@@ -215,6 +223,10 @@ class TestProcessRun:
                 prompt_version_id=version.id,
                 dataset_id=dataset.id,
                 profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
                 status=RunStatus.RUNNING,
             )
             session.add(run)
@@ -229,7 +241,7 @@ class TestProcessRun:
             patch("src.runs.service.async_session", test_session_factory),
             patch("src.runs.service.get_llm_client", return_value=mock_llm),
         ):
-            await process_run(run_id)
+            await execute_run(run_id)
 
         async with test_session_factory() as session:
             from sqlmodel import select
@@ -275,6 +287,10 @@ class TestProcessRun:
                 prompt_version_id=version.id,
                 dataset_id=dataset.id,
                 profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
                 status=RunStatus.RUNNING,
             )
             session.add(run)
@@ -289,7 +305,7 @@ class TestProcessRun:
             patch("src.runs.service.async_session", test_session_factory),
             patch("src.runs.service.get_llm_client", return_value=mock_llm),
         ):
-            await process_run(run_id)
+            await execute_run(run_id)
 
         async with test_session_factory() as session:
             from sqlmodel import select
@@ -335,6 +351,10 @@ class TestProcessRun:
                 prompt_version_id=version.id,
                 dataset_id=dataset.id,
                 profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
                 status=RunStatus.RUNNING,
             )
             session.add(run)
@@ -349,7 +369,7 @@ class TestProcessRun:
             patch("src.runs.service.async_session", test_session_factory),
             patch("src.runs.service.get_llm_client", return_value=mock_llm),
         ):
-            await process_run(run_id)
+            await execute_run(run_id)
 
         async with test_session_factory() as session:
             from sqlmodel import select

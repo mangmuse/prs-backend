@@ -34,8 +34,8 @@ async def test_create_profile_with_constraints(
             "name": "제약조건 테스트",
             "semanticThreshold": 0.8,
             "globalConstraints": [
-                {"type": "contains", "value": "verdict"},
-                {"type": "max_length", "value": 500},
+                {"type": "contains", "target": "verdict", "value": "TRUE"},
+                {"type": "max_length", "target": "reasoning", "max": 500},
             ],
         },
         cookies=guest_cookies,
@@ -55,7 +55,9 @@ async def test_list_profiles(
         "/evaluator-profiles",
         json={
             "name": "프로필1",
-            "globalConstraints": [{"type": "contains", "value": "test"}],
+            "globalConstraints": [
+                {"type": "contains", "target": "verdict", "value": "test"}
+            ],
         },
         cookies=guest_cookies,
     )

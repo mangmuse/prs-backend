@@ -1,22 +1,36 @@
+from __future__ import annotations
+
+import asyncio
 import logging
+import time
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, func, select
+from sqlmodel import col, select
 
 from src.auth.models import Guest, User
-from src.common.types import JsonValue, LogicConstraint
+
+if TYPE_CHECKING:
+    from src.llm.base import LLMClient
+from src.common.types import JsonValue
 from src.database import async_session
-from src.datasets.models import Dataset, DatasetRow
+from src.datasets.models import DatasetRow
 from src.llm.factory import get_llm_client
+from src.llm.rate_limiter import extract_provider, get_semaphore
 from src.profiles.models import EvaluatorProfile
-from src.prompts.models import Prompt, PromptVersion
-from src.runs.evaluator.waterfall import evaluate_waterfall
+from src.prompts.models import PromptVersion
+from src.runs.evaluator.waterfall import evaluate_waterfall, re_evaluate_from_stored
 from src.runs.models import ResultStatus, Run, RunResult, RunStatus
 from src.runs.regression import calculate_p_value
+from src.runs.repository import RunRepository
 from src.runs.schemas import (
     AssembledPrompt,
+    CreateRunRequest,
     ProfileInRun,
+    ReEvaluatedRow,
+    ReEvaluateRequest,
+    ReEvaluateResponse,
     RegressionComparisonResponse,
     RelatedRunResponse,
     RelatedVersionsResponse,
@@ -26,9 +40,39 @@ from src.runs.schemas import (
     RunResultResponse,
     RunSummaryResponse,
     UnexecutedVersionResponse,
+    UpdateProfileSnapshotRequest,
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def create_run(
+    data: CreateRunRequest,
+    session: AsyncSession,
+) -> Run:
+    """Run 생성 (DB 저장)."""
+    repo = RunRepository(session)
+
+    profile = await repo.get_profile_by_id(data.profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다")
+
+    profile_snapshot = {
+        "semantic_threshold": profile.semantic_threshold,
+        "global_constraints": [
+            c.model_dump() if hasattr(c, "model_dump") else c
+            for c in (profile.global_constraints or [])
+        ],
+    }
+
+    run = Run(
+        prompt_version_id=data.prompt_version_id,
+        dataset_id=data.dataset_id,
+        profile_id=data.profile_id,
+        profile_snapshot=profile_snapshot,
+        status=RunStatus.RUNNING,
+    )
+    return await repo.create(run)
 
 
 def assemble_prompt(
@@ -41,7 +85,11 @@ def assemble_prompt(
     예: "검증할 문장: {{claim}}" + {"claim": "서울은 수도다"}
     → "검증할 문장: 서울은 수도다"
     """
-    logger.debug("프롬프트 조립 시작 | template_len=%d, input_keys=%s", len(user_template), list(input_data.keys()))
+    logger.debug(
+        "프롬프트 조립 시작 | template_len=%d, input_keys=%s",
+        len(user_template),
+        list(input_data.keys()),
+    )
 
     result = user_template
     for key, value in input_data.items():
@@ -50,20 +98,98 @@ def assemble_prompt(
             result = result.replace(placeholder, str(value))
             logger.debug("치환 성공 | key=%s", key)
         else:
-            logger.warning("치환 실패 | key='%s'가 템플릿에 없음 (사용 가능: %s)", key, placeholder)
+            logger.warning(
+                "치환 실패 | key='%s'가 템플릿에 없음 (사용 가능: %s)", key, placeholder
+            )
 
     logger.debug("프롬프트 조립 완료 | result_len=%d", len(result))
     return result
 
 
-async def process_run(run_id: int) -> None:
-    """BackgroundTask에서 Run 처리."""
+async def _process_single_row(
+    row: DatasetRow,
+    run_id: int,
+    version: PromptVersion,
+    llm: LLMClient,
+    threshold: float,
+    constraints: list,
+) -> RunResult:
+    """단일 row 처리 (LLM 호출 + 평가). 예외 발생 시 상위에서 처리."""
+    assert row.id is not None
+    start_time = time.perf_counter()
+
+    user_message = assemble_prompt(version.user_template, row.input_data)
+
+    logger.debug(
+        "LLM 호출 시작 | row_id=%d, model=%s, temperature=%.1f",
+        row.id,
+        version.model,
+        version.temperature,
+    )
+    llm_start = time.perf_counter()
+    raw_output = await llm.generate(
+        system_instruction=version.system_instruction,
+        user_message=user_message,
+        temperature=version.temperature,
+    )
+    llm_ms = int((time.perf_counter() - llm_start) * 1000)
+    logger.debug(
+        "LLM 응답 수신 | row_id=%d, output_len=%d, llm_ms=%d",
+        row.id,
+        len(raw_output),
+        llm_ms,
+    )
+
+    eval_start = time.perf_counter()
+    eval_result = evaluate_waterfall(
+        raw_output=raw_output,
+        output_schema=version.output_schema,
+        expected_output=row.expected_output,
+        threshold=threshold,
+        constraints=constraints,
+    )
+    eval_ms = int((time.perf_counter() - eval_start) * 1000)
+
+    total_ms = int((time.perf_counter() - start_time) * 1000)
+
+    parsed = eval_result.format_result.parsed_output
+    parsed_dict = parsed if isinstance(parsed, dict) else None
+
+    return RunResult(
+        run_id=run_id,
+        dataset_row_id=row.id,
+        input_snapshot=row.input_data,
+        expected_snapshot=row.expected_output,
+        assembled_prompt={
+            "system_instruction": version.system_instruction,
+            "user_message": user_message,
+        },
+        raw_output=raw_output,
+        is_format_passed=eval_result.format_result.passed,
+        parsed_output=parsed_dict,
+        semantic_score=(
+            eval_result.semantic_result.semantic_score
+            if eval_result.semantic_result
+            else 0.0
+        ),
+        constraint_results=(
+            eval_result.constraint_result.model_dump()
+            if eval_result.constraint_result
+            else {}
+        ),
+        status=eval_result.status,
+        trace={"llm_ms": llm_ms, "eval_ms": eval_ms, "total_ms": total_ms},
+    )
+
+
+async def execute_run(run_id: int) -> None:
+    """Run 실행 로직 (LLM 호출 및 평가 수행). 모든 row를 병렬로 처리."""
+    start_time = time.perf_counter()
     logger.info("Run 처리 시작 | run_id=%d", run_id)
 
     async with async_session() as session:
-        run = (await session.execute(
-            select(Run).where(Run.id == run_id)
-        )).scalar_one_or_none()
+        repo = RunRepository(session)
+        run = await repo.get_by_id(run_id)
 
         if run is None:
             logger.error("Run을 찾을 수 없음 | run_id=%d", run_id)
@@ -72,93 +198,98 @@ async def process_run(run_id: int) -> None:
         try:
             assert run.id is not None
 
-            version = (await session.execute(
-                select(PromptVersion).where(PromptVersion.id == run.prompt_version_id)
-            )).scalar_one()
+            version = (
+                await session.execute(
+                    select(PromptVersion).where(
+                        PromptVersion.id == run.prompt_version_id
+                    )
+                )
+            ).scalar_one()
 
-            rows = (await session.execute(
-                select(DatasetRow)
-                .where(DatasetRow.dataset_id == run.dataset_id)
-                .order_by(col(DatasetRow.row_index))
-            )).scalars().all()
+            rows = (
+                (
+                    await session.execute(
+                        select(DatasetRow)
+                        .where(DatasetRow.dataset_id == run.dataset_id)
+                        .order_by(col(DatasetRow.row_index))
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
-            profile = (await session.execute(
-                select(EvaluatorProfile).where(EvaluatorProfile.id == run.profile_id)
-            )).scalar_one()
+            threshold = run.profile_snapshot["semantic_threshold"]
+            snapshot_constraints = run.profile_snapshot["global_constraints"]
 
             logger.info(
-                "Run 설정 로드 완료 | version_id=%d, model=%s, rows=%d, profile=%s, threshold=%.2f",
+                "Run 설정 로드 완료 | version_id=%d, model=%s, rows=%d, threshold=%.2f",
                 version.id,
                 version.model,
                 len(rows),
-                profile.name,
-                profile.semantic_threshold,
+                threshold,
             )
 
             llm = get_llm_client(version.model)
 
-            for idx, row in enumerate(rows, 1):
-                assert row.id is not None
-                logger.info("Row 처리 시작 | row=%d/%d, row_id=%d", idx, len(rows), row.id)
+            provider = extract_provider(version.model)
+            sem = get_semaphore(provider)
 
-                user_message = assemble_prompt(version.user_template, row.input_data)
+            async def _bounded_process(row: DatasetRow) -> RunResult:
+                async with sem:
+                    return await _process_single_row(
+                        row=row,
+                        run_id=run.id,
+                        version=version,
+                        llm=llm,
+                        threshold=threshold,
+                        constraints=snapshot_constraints,
+                    )
 
-                logger.debug("LLM 호출 시작 | model=%s, temperature=%.1f", version.model, version.temperature)
-                raw_output = await llm.generate(
-                    system_instruction=version.system_instruction,
-                    user_message=user_message,
-                    temperature=version.temperature,
-                )
-                logger.debug("LLM 응답 수신 | output_len=%d", len(raw_output))
+            tasks = [_bounded_process(row) for row in rows]
 
-                constraints: list[LogicConstraint] = profile.global_constraints or []
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                eval_result = evaluate_waterfall(
-                    raw_output=raw_output,
-                    output_schema=version.output_schema,
-                    expected_output=row.expected_output,
-                    threshold=profile.semantic_threshold,
-                    constraints=constraints,
-                )
+            success_count = 0
+            fail_count = 0
+            for idx, result in enumerate(results, 1):
+                if isinstance(result, BaseException):
+                    logger.error(
+                        "Row %d 처리 실패 | run_id=%d, error=%s",
+                        idx,
+                        run_id,
+                        str(result),
+                    )
+                    fail_count += 1
+                    continue
+                await repo.create_result(result)
+                success_count += 1
 
-                parsed = eval_result.format_result.parsed_output
-                parsed_dict = parsed if isinstance(parsed, dict) else None
+            logger.info(
+                "Row 처리 완료 | run_id=%d, 성공=%d, 실패=%d",
+                run_id,
+                success_count,
+                fail_count,
+            )
 
-                result = RunResult(
-                    run_id=run.id,
-                    dataset_row_id=row.id,
-                    input_snapshot=row.input_data,
-                    expected_snapshot=row.expected_output,
-                    assembled_prompt={
-                        "system_instruction": version.system_instruction,
-                        "user_message": user_message,
-                    },
-                    raw_output=raw_output,
-                    is_format_passed=eval_result.format_result.passed,
-                    parsed_output=parsed_dict,
-                    semantic_score=(
-                        eval_result.semantic_result.semantic_score
-                        if eval_result.semantic_result
-                        else 0.0
-                    ),
-                    logic_results=(
-                        eval_result.logic_result.model_dump()
-                        if eval_result.logic_result
-                        else {}
-                    ),
-                    status=eval_result.status,
-                )
-                session.add(result)
-                logger.info("Row 처리 완료 | row=%d/%d, status=%s", idx, len(rows), eval_result.status.value)
+            elapsed_secs = time.perf_counter() - start_time
 
-            run.status = RunStatus.COMPLETED
-            logger.info("Run 완료 | run_id=%d, status=COMPLETED", run_id)
-            await session.commit()
+            if success_count == 0 and fail_count > 0:
+                final_status = RunStatus.FAILED
+            else:
+                final_status = RunStatus.COMPLETED
+
+            await repo.update_status(run_id, final_status)
+            logger.info(
+                "Run 완료 | run_id=%d, status=%s, elapsed=%.1fs (%.1fmin)",
+                run_id,
+                final_status.value.upper(),
+                elapsed_secs,
+                elapsed_secs / 60,
+            )
 
         except Exception as e:
             logger.exception("Run 처리 실패 | run_id=%d, error=%s", run_id, str(e))
-            run.status = RunStatus.FAILED
-            await session.commit()
+            await repo.update_status(run_id, RunStatus.FAILED)
 
 
 async def get_runs_summary(
@@ -171,104 +302,8 @@ async def get_runs_summary(
     Args:
         grouped: True면 같은 조합(prompt_id + dataset_id + profile_id)에서 최신 Run만 반환
     """
-    pass_count_subq = (
-        select(func.count())
-        .where(
-            col(RunResult.run_id) == col(Run.id),
-            col(RunResult.status) == ResultStatus.PASS,
-        )
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    total_count_subq = (
-        select(func.count())
-        .where(col(RunResult.run_id) == col(Run.id))
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    avg_semantic_subq = (
-        select(func.avg(RunResult.semantic_score))
-        .where(col(RunResult.run_id) == col(Run.id))
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    format_pass_subq = (
-        select(func.count())
-        .where(
-            col(RunResult.run_id) == col(Run.id),
-            col(RunResult.is_format_passed) == True,  # noqa: E712
-        )
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    semantic_pass_subq = (
-        select(func.count())
-        .where(
-            col(RunResult.run_id) == col(Run.id),
-            col(RunResult.status) != ResultStatus.FORMAT,
-            col(RunResult.status) != ResultStatus.SEMANTIC,
-        )
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    logic_pass_subq = (
-        select(func.count())
-        .where(
-            col(RunResult.run_id) == col(Run.id),
-            col(RunResult.status) == ResultStatus.PASS,
-        )
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    stmt = (
-        select(
-            Run,
-            col(Prompt.id).label("prompt_id"),
-            PromptVersion.version_number,
-            col(Prompt.name).label("prompt_name"),
-            col(Dataset.name).label("dataset_name"),
-            col(EvaluatorProfile.name).label("profile_name"),
-            pass_count_subq.label("pass_count"),
-            total_count_subq.label("total_count"),
-            avg_semantic_subq.label("avg_semantic"),
-            format_pass_subq.label("format_pass_count"),
-            semantic_pass_subq.label("semantic_pass_count"),
-            logic_pass_subq.label("logic_pass_count"),
-        )
-        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
-        .join(Dataset, col(Run.dataset_id) == col(Dataset.id))
-        .join(EvaluatorProfile, col(Run.profile_id) == col(EvaluatorProfile.id))
-    )
-
-    if isinstance(identity, Guest):
-        stmt = stmt.where(col(Prompt.guest_id) == identity.id)
-    else:
-        stmt = stmt.where(col(Prompt.user_id) == identity.id)
-
-    if grouped:
-        latest_run_ids_subq = (
-            select(func.max(Run.id).label("latest_id"))
-            .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-            .group_by(
-                col(PromptVersion.prompt_id),
-                col(Run.dataset_id),
-                col(Run.profile_id),
-            )
-            .subquery()
-        )
-        stmt = stmt.where(col(Run.id).in_(select(latest_run_ids_subq.c.latest_id)))
-
-    stmt = stmt.order_by(col(Run.created_at).desc())
-
-    result = await session.execute(stmt)
-    rows = result.all()
+    repo = RunRepository(session)
+    rows = await repo.get_runs_summary(identity, grouped)
 
     return [
         RunSummaryResponse(
@@ -282,24 +317,16 @@ async def get_runs_summary(
             profile_id=row.Run.profile_id,
             profile_name=row.profile_name,
             status=row.Run.status.value,
-            pass_rate=(
-                (row.pass_count / row.total_count) if row.total_count else None
-            ),
+            pass_rate=((row.pass_count / row.total_count) if row.total_count else None),
             avg_semantic=row.avg_semantic,
             format_pass_rate=(
-                (row.format_pass_count / row.total_count)
-                if row.total_count
-                else None
+                (row.format_pass_count / row.total_count) if row.total_count else None
             ),
             semantic_pass_rate=(
-                (row.semantic_pass_count / row.total_count)
-                if row.total_count
-                else None
+                (row.semantic_pass_count / row.total_count) if row.total_count else None
             ),
-            logic_pass_rate=(
-                (row.logic_pass_count / row.total_count)
-                if row.total_count
-                else None
+            constraint_pass_rate=(
+                (row.constraint_pass_count / row.total_count) if row.total_count else None
             ),
             total_rows=row.total_count or 0,
             created_at=row.Run.created_at,
@@ -313,29 +340,10 @@ async def get_run_detail(
     identity: Guest | User,
     session: AsyncSession,
 ) -> RunDetailResponse:
-    """Run 상세 조회 (Live Playground용)."""
-    stmt = (
-        select(
-            Run,
-            col(Prompt.id).label("prompt_id"),
-            col(Prompt.name).label("prompt_name"),
-            col(PromptVersion.version_number).label("version_number"),
-            col(Dataset.name).label("dataset_name"),
-        )
-        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
-        .join(Dataset, col(Run.dataset_id) == col(Dataset.id))
-        .where(col(Run.id) == run_id)
-    )
+    """Run 상세 조회 (결과 및 통계 포함)."""
+    repo = RunRepository(session)
 
-    if isinstance(identity, Guest):
-        stmt = stmt.where(col(Prompt.guest_id) == identity.id)
-    else:
-        stmt = stmt.where(col(Prompt.user_id) == identity.id)
-
-    result = await session.execute(stmt)
-    row = result.one_or_none()
-
+    row = await repo.get_run_detail(run_id, identity)
     if not row:
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
@@ -345,19 +353,10 @@ async def get_run_detail(
     version_number = row.version_number
     dataset_name = row.dataset_name
 
-    profile = (
-        await session.execute(
-            select(EvaluatorProfile).where(col(EvaluatorProfile.id) == run.profile_id)
-        )
-    ).scalar_one()
+    profile = await repo.get_profile_by_id(run.profile_id)
+    assert profile is not None
 
-    results = (
-        await session.execute(
-            select(RunResult)
-            .where(col(RunResult.run_id) == run_id)
-            .order_by(col(RunResult.id))
-        )
-    ).scalars().all()
+    results = await repo.get_results_by_run_id(run_id)
 
     assert run.id is not None
     assert profile.id is not None
@@ -367,10 +366,11 @@ async def get_run_detail(
     avg_semantic = sum(r.semantic_score for r in results) / total if total else 0.0
     format_pass_count = sum(1 for r in results if r.is_format_passed)
     semantic_pass_count = sum(
-        1 for r in results
+        1
+        for r in results
         if r.status not in (ResultStatus.FORMAT, ResultStatus.SEMANTIC)
     )
-    logic_pass_count = pass_count
+    constraint_pass_count = pass_count
 
     result_responses: list[RunResultResponse] = []
     for idx, r in enumerate(results, 1):
@@ -389,7 +389,7 @@ async def get_run_detail(
                 status=r.status,
                 is_format_passed=r.is_format_passed,
                 semantic_score=r.semantic_score,
-                logic_results=r.logic_results,
+                constraint_results=r.constraint_results,
                 raw_output=r.raw_output,
                 parsed_output=r.parsed_output,
             )
@@ -409,15 +409,15 @@ async def get_run_detail(
         profile=ProfileInRun(
             id=profile.id,
             name=profile.name,
-            semantic_threshold=profile.semantic_threshold,
-            global_constraints=profile.global_constraints or [],
+            semantic_threshold=run.profile_snapshot["semantic_threshold"],
+            global_constraints=run.profile_snapshot["global_constraints"],
         ),
         metrics=RunMetrics(
             pass_rate=(pass_count / total) if total else 0.0,
             avg_semantic=avg_semantic,
             format_pass_rate=(format_pass_count / total) if total else 0.0,
             semantic_pass_rate=(semantic_pass_count / total) if total else 0.0,
-            logic_pass_rate=(logic_pass_count / total) if total else 0.0,
+            constraint_pass_rate=(constraint_pass_count / total) if total else 0.0,
         ),
         results=result_responses,
     )
@@ -429,24 +429,9 @@ async def get_related_versions(
     session: AsyncSession,
 ) -> RelatedVersionsResponse:
     """현재 Run과 같은 조합의 다른 버전 Run들 및 미실행 버전 조회."""
-    run_stmt = (
-        select(
-            Run,
-            col(PromptVersion.prompt_id).label("prompt_id"),
-        )
-        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
-        .where(col(Run.id) == run_id)
-    )
+    repo = RunRepository(session)
 
-    if isinstance(identity, Guest):
-        run_stmt = run_stmt.where(col(Prompt.guest_id) == identity.id)
-    else:
-        run_stmt = run_stmt.where(col(Prompt.user_id) == identity.id)
-
-    run_result = await session.execute(run_stmt)
-    run_row = run_result.one_or_none()
-
+    run_row = await repo.get_run_with_prompt_id(run_id, identity)
     if not run_row:
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
@@ -455,41 +440,7 @@ async def get_related_versions(
     dataset_id = current_run.dataset_id
     profile_id = current_run.profile_id
 
-    pass_count_subq = (
-        select(func.count())
-        .where(
-            col(RunResult.run_id) == col(Run.id),
-            col(RunResult.status) == ResultStatus.PASS,
-        )
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    total_count_subq = (
-        select(func.count())
-        .where(col(RunResult.run_id) == col(Run.id))
-        .correlate(Run)
-        .scalar_subquery()
-    )
-
-    related_runs_stmt = (
-        select(
-            Run,
-            col(PromptVersion.version_number).label("version_number"),
-            pass_count_subq.label("pass_count"),
-            total_count_subq.label("total_count"),
-        )
-        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-        .where(
-            col(PromptVersion.prompt_id) == prompt_id,
-            col(Run.dataset_id) == dataset_id,
-            col(Run.profile_id) == profile_id,
-        )
-        .order_by(col(PromptVersion.version_number).desc())
-    )
-
-    related_result = await session.execute(related_runs_stmt)
-    related_rows = related_result.all()
+    related_rows = await repo.get_related_runs(prompt_id, dataset_id, profile_id)
 
     executed_runs = [
         RelatedRunResponse(
@@ -502,17 +453,9 @@ async def get_related_versions(
         for row in related_rows
     ]
 
-    executed_version_ids = {
-        row.Run.prompt_version_id for row in related_rows
-    }
+    executed_version_ids = {row.Run.prompt_version_id for row in related_rows}
 
-    all_versions_stmt = (
-        select(PromptVersion)
-        .where(col(PromptVersion.prompt_id) == prompt_id)
-        .order_by(col(PromptVersion.version_number).desc())
-    )
-    all_versions_result = await session.execute(all_versions_stmt)
-    all_versions = all_versions_result.scalars().all()
+    all_versions = await repo.get_all_versions_by_prompt_id(prompt_id)
 
     unexecuted_versions = [
         UnexecutedVersionResponse(
@@ -529,41 +472,6 @@ async def get_related_versions(
     )
 
 
-async def _get_run_results_with_auth(
-    run_id: int,
-    identity: Guest | User,
-    session: AsyncSession,
-) -> list[RunResult]:
-    """Run 소유권 검증 후 결과 조회."""
-    stmt = (
-        select(Run)
-        .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
-        .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))
-        .where(col(Run.id) == run_id)
-    )
-
-    if isinstance(identity, Guest):
-        stmt = stmt.where(col(Prompt.guest_id) == identity.id)
-    else:
-        stmt = stmt.where(col(Prompt.user_id) == identity.id)
-
-    result = await session.execute(stmt)
-    run = result.scalar_one_or_none()
-
-    if not run:
-        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
-
-    results = (
-        await session.execute(
-            select(RunResult)
-            .where(col(RunResult.run_id) == run_id)
-            .order_by(col(RunResult.dataset_row_id))
-        )
-    ).scalars().all()
-
-    return list(results)
-
-
 async def compare_runs(
     base_run_id: int,
     target_run_id: int,
@@ -571,8 +479,15 @@ async def compare_runs(
     session: AsyncSession,
 ) -> RegressionComparisonResponse:
     """두 Run 간 회귀 분석용 raw 데이터 제공."""
-    base_results = await _get_run_results_with_auth(base_run_id, identity, session)
-    target_results = await _get_run_results_with_auth(target_run_id, identity, session)
+    repo = RunRepository(session)
+
+    base_results = await repo.get_run_results_for_comparison(base_run_id, identity)
+    if base_results is None:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    target_results = await repo.get_run_results_for_comparison(target_run_id, identity)
+    if target_results is None:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
     base_by_row = {r.dataset_row_id: r for r in base_results}
     target_by_row = {r.dataset_row_id: r for r in target_results}
@@ -607,3 +522,71 @@ async def compare_runs(
         p_value=p_value,
         row_comparisons=row_comparisons,
     )
+
+
+async def update_run_profile_snapshot(
+    run_id: int,
+    data: UpdateProfileSnapshotRequest,
+    identity: Guest | User,
+    session: AsyncSession,
+) -> None:
+    """Run의 profile_snapshot 업데이트."""
+    repo = RunRepository(session)
+
+    run = await repo.get_by_id_with_owner(run_id, identity)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    run.profile_snapshot = {
+        "semantic_threshold": data.semantic_threshold,
+        "global_constraints": [
+            c.model_dump() for c in data.global_constraints
+        ],
+    }
+    await session.commit()
+
+
+async def re_evaluate_run(
+    run_id: int,
+    data: ReEvaluateRequest,
+    identity: Guest | User,
+    session: AsyncSession,
+) -> ReEvaluateResponse:
+    """저장된 결과로 재평가 (LLM 호출 없이 미리보기)."""
+    repo = RunRepository(session)
+
+    run = await repo.get_by_id_with_owner(run_id, identity)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
+
+    results = await repo.get_results_by_run_id(run_id)
+
+    re_evaluated: list[ReEvaluatedRow] = []
+    pass_count = 0
+
+    for r in results:
+        assert r.id is not None
+
+        new_status, constraint_result = re_evaluate_from_stored(
+            is_format_passed=r.is_format_passed,
+            parsed_output=r.parsed_output,
+            semantic_score=r.semantic_score,
+            threshold=data.semantic_threshold,
+            constraints=data.global_constraints,
+        )
+
+        if new_status == ResultStatus.PASS:
+            pass_count += 1
+
+        re_evaluated.append(
+            ReEvaluatedRow(
+                id=r.id,
+                status=new_status,
+                constraint_results=constraint_result.model_dump() if constraint_result else None,
+            )
+        )
+
+    total = len(results)
+    pass_rate = (pass_count / total) if total else 0.0
+
+    return ReEvaluateResponse(results=re_evaluated, pass_rate=pass_rate)

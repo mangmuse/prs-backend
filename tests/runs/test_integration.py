@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 from src.prompts.models import OutputSchemaType
 from src.runs.models import Run, RunStatus
-from src.runs.service import process_run
+from src.runs.service import execute_run
 from tests.conftest import MockLLMClient
 
 
@@ -44,6 +44,10 @@ async def test_run_성공_플로우_json_object(
             prompt_version_id=version.id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run)
@@ -57,7 +61,7 @@ async def test_run_성공_플로우_json_object(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
     ):
-        await process_run(run_id)
+        await execute_run(run_id)
 
     list_response = await client.get("/runs", cookies=guest_cookies)
     assert list_response.status_code == 200
@@ -113,6 +117,10 @@ async def test_run_semantic_실패_플로우(
             prompt_version_id=version.id,
             dataset_id=dataset.id,
             profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": profile.semantic_threshold,
+                "global_constraints": profile.global_constraints or [],
+            },
             status=RunStatus.RUNNING,
         )
         session.add(run)
@@ -126,7 +134,7 @@ async def test_run_semantic_실패_플로우(
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
     ):
-        await process_run(run_id)
+        await execute_run(run_id)
 
     list_response = await client.get("/runs", cookies=guest_cookies)
     assert list_response.status_code == 200

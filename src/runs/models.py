@@ -34,6 +34,7 @@ class Run(SQLModel, table=True):
     prompt_version_id: int = Field(foreign_key="prompt_versions.id", index=True)
     dataset_id: int = Field(foreign_key="datasets.id", index=True)
     profile_id: int = Field(foreign_key="evaluator_profiles.id", index=True)
+    profile_snapshot: dict[str, Any] = Field(sa_column=Column(JSONB))
     status: RunStatus = Field(default=RunStatus.RUNNING)
     user_id: int | None = Field(default=None, foreign_key="users.id", index=True)
     guest_id: UUID | None = Field(default=None, foreign_key="guests.id", index=True)
