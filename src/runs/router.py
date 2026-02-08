@@ -49,7 +49,7 @@ async def create_run(
     run = await create_run_service(data, session)
 
     assert run.id is not None
-    background_tasks.add_task(process_run_task, run.id)
+    background_tasks.add_task(process_run_task, run.id, data.api_key)
 
     return RunCreateResponse(
         id=run.id,

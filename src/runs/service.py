@@ -18,7 +18,7 @@ from src.database import async_session
 from src.datasets.models import DatasetRow
 from src.llm.factory import get_llm_client
 from src.llm.rate_limiter import extract_provider, get_semaphore
-from src.profiles.models import EvaluatorProfile
+from src.llm.security import sanitize_error_message
 from src.prompts.models import PromptVersion
 from src.runs.evaluator.waterfall import evaluate_waterfall, re_evaluate_from_stored
 from src.runs.models import ResultStatus, Run, RunResult, RunStatus
@@ -182,7 +182,7 @@ async def _process_single_row(
     )
 
 
-async def execute_run(run_id: int) -> None:
+async def execute_run(run_id: int, api_key: str | None = None) -> None:
     """Run 실행 로직 (LLM 호출 및 평가 수행). 모든 row를 병렬로 처리."""
     start_time = time.perf_counter()
     logger.info("Run 처리 시작 | run_id=%d", run_id)
@@ -229,7 +229,7 @@ async def execute_run(run_id: int) -> None:
                 threshold,
             )
 
-            llm = get_llm_client(version.model)
+            llm = get_llm_client(version.model, api_key=api_key)
 
             provider = extract_provider(version.model)
             sem = get_semaphore(provider)
@@ -257,7 +257,7 @@ async def execute_run(run_id: int) -> None:
                         "Row %d 처리 실패 | run_id=%d, error=%s",
                         idx,
                         run_id,
-                        str(result),
+                        sanitize_error_message(str(result)),
                     )
                     fail_count += 1
                     continue
@@ -288,7 +288,11 @@ async def execute_run(run_id: int) -> None:
             )
 
         except Exception as e:
-            logger.exception("Run 처리 실패 | run_id=%d, error=%s", run_id, str(e))
+            logger.exception(
+                "Run 처리 실패 | run_id=%d, error=%s",
+                run_id,
+                sanitize_error_message(str(e)),
+            )
             await repo.update_status(run_id, RunStatus.FAILED)
 
 

@@ -15,3 +15,17 @@ class ModelsResponse(CamelCaseModel):
     """LLM 모델 목록 응답."""
 
     models: list[ModelInfo]
+
+
+class VerifyKeyRequest(CamelCaseModel):
+    """API Key 검증 요청."""
+
+    provider: str
+    api_key: str
+
+
+class VerifyKeyResponse(CamelCaseModel):
+    """API Key 검증 응답."""
+
+    valid: bool
+    error: str | None = None

@@ -41,6 +41,30 @@ class TestAnthropicClient:
                 assert result == "Test response"
 
 
+class TestAnthropicClientWithExternalKey:
+    """외부 API Key 주입 테스트."""
+
+    def test_external_api_key_overrides_settings(self):
+        """외부 api_key가 환경 설정 키를 덮어써야 한다."""
+        with patch("src.llm.anthropic.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(ANTHROPIC_API_KEY="env-key")
+            with patch("src.llm.anthropic.AsyncAnthropic") as mock_anthropic:
+                from src.llm.anthropic import AnthropicClient
+
+                AnthropicClient(model="claude-sonnet-4", api_key="user-key")
+                mock_anthropic.assert_called_once_with(api_key="user-key")
+
+    def test_none_api_key_falls_back_to_settings(self):
+        """api_key=None이면 환경 설정 키를 사용해야 한다."""
+        with patch("src.llm.anthropic.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(ANTHROPIC_API_KEY="env-key")
+            with patch("src.llm.anthropic.AsyncAnthropic") as mock_anthropic:
+                from src.llm.anthropic import AnthropicClient
+
+                AnthropicClient(model="claude-sonnet-4", api_key=None)
+                mock_anthropic.assert_called_once_with(api_key="env-key")
+
+
 class TestAnthropicClientListModels:
     """Anthropic list_models 테스트."""
 

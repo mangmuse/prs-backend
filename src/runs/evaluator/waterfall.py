@@ -2,8 +2,8 @@ import logging
 
 from src.common.types import LogicConstraint
 from src.prompts.models import OutputSchemaType
-from src.runs.evaluator.format_layer import check_format
 from src.runs.evaluator.constraint_layer import FieldValue, check_constraints
+from src.runs.evaluator.format_layer import check_format
 from src.runs.evaluator.semantic_layer import check_semantic
 from src.runs.models import ResultStatus
 from src.runs.schemas import (

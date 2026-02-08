@@ -46,6 +46,26 @@ class TestGeminiClient:
                 assert result == "Test response"
 
 
+class TestGeminiClientWithExternalKey:
+    """외부 API Key 주입 테스트."""
+
+    def test_external_api_key_overrides_settings(self):
+        """외부 api_key가 환경 설정 키를 덮어써야 한다."""
+        with patch("src.llm.gemini.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(GOOGLE_API_KEY="env-key")
+            with patch("src.llm.gemini.genai.Client") as mock_genai:
+                GeminiClient(model="gemini-2.5-flash", api_key="user-key")
+                mock_genai.assert_called_once_with(api_key="user-key")
+
+    def test_none_api_key_falls_back_to_settings(self):
+        """api_key=None이면 환경 설정 키를 사용해야 한다."""
+        with patch("src.llm.gemini.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(GOOGLE_API_KEY="env-key")
+            with patch("src.llm.gemini.genai.Client") as mock_genai:
+                GeminiClient(model="gemini-2.5-flash", api_key=None)
+                mock_genai.assert_called_once_with(api_key="env-key")
+
+
 class TestGeminiClientIsTextModel:
     """Gemini 모델 필터 테스트."""
 

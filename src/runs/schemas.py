@@ -53,6 +53,7 @@ class CreateRunRequest(CamelCaseModel):
     prompt_version_id: int
     dataset_id: int
     profile_id: int
+    api_key: str | None = None
 
 
 class UpdateProfileSnapshotRequest(CamelCaseModel):

@@ -19,14 +19,15 @@ class GeminiClient(BaseLLMClient):
         "nano-banana",
     ]
 
-    def __init__(self, model: str = "gemini-2.5-flash"):
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: str | None = None):
         settings = get_settings()
+        resolved_key = api_key or settings.GOOGLE_API_KEY
         super().__init__(
-            api_key=settings.GOOGLE_API_KEY,
+            api_key=resolved_key,
             key_name="GOOGLE_API_KEY",
             model=model,
         )
-        self.client: genai.Client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        self.client: genai.Client = genai.Client(api_key=resolved_key)
 
     async def generate(
         self,

@@ -9,14 +9,15 @@ from src.llm.schemas import ModelInfo
 class AnthropicClient(BaseLLMClient):
     """Anthropic Claude LLM 클라이언트."""
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str | None = None):
         settings = get_settings()
+        resolved_key = api_key or settings.ANTHROPIC_API_KEY
         super().__init__(
-            api_key=settings.ANTHROPIC_API_KEY,
+            api_key=resolved_key,
             key_name="ANTHROPIC_API_KEY",
             model=model,
         )
-        self.client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self.client = AsyncAnthropic(api_key=resolved_key)
 
     async def generate(
         self,

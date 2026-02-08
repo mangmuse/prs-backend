@@ -11,7 +11,7 @@ from src.common.types import (
     RangeConstraint,
     RegexConstraint,
 )
-from src.runs.schemas import ConstraintResult, ConstraintLayerResult
+from src.runs.schemas import ConstraintLayerResult, ConstraintResult
 
 logger = logging.getLogger(__name__)
 

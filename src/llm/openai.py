@@ -27,14 +27,15 @@ class OpenAIClient(BaseLLMClient):
         "search",
     ]
 
-    def __init__(self, model: str = "gpt-4o"):
+    def __init__(self, model: str = "gpt-4o", api_key: str | None = None):
         settings = get_settings()
+        resolved_key = api_key or settings.OPENAI_API_KEY
         super().__init__(
-            api_key=settings.OPENAI_API_KEY,
+            api_key=resolved_key,
             key_name="OPENAI_API_KEY",
             model=model,
         )
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=resolved_key)
 
     async def generate(
         self,
@@ -57,9 +58,7 @@ class OpenAIClient(BaseLLMClient):
         model_lower = model_id.lower()
         if any(p in model_lower for p in OpenAIClient.EXCLUDE_PATTERNS):
             return False
-        if model_lower.endswith("-pro") or "-pro-" in model_lower:
-            return False
-        return True
+        return not (model_lower.endswith("-pro") or "-pro-" in model_lower)
 
     async def list_models(self) -> list[ModelInfo]:
         """텍스트 생성용 모델 목록 조회 (최신순 정렬)."""

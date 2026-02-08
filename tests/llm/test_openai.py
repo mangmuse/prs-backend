@@ -109,6 +109,26 @@ class TestOpenAIClientIsTextModel:
         assert OpenAIClient._is_text_model("o1-pro-2025-03-19") is False
 
 
+class TestOpenAIClientWithExternalKey:
+    """외부 API Key 주입 테스트."""
+
+    def test_external_api_key_overrides_settings(self):
+        """외부 api_key가 환경 설정 키를 덮어써야 한다."""
+        with patch("src.llm.openai.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(OPENAI_API_KEY="env-key")
+            with patch("src.llm.openai.AsyncOpenAI") as mock_openai:
+                OpenAIClient(model="gpt-4o", api_key="user-key")
+                mock_openai.assert_called_once_with(api_key="user-key")
+
+    def test_none_api_key_falls_back_to_settings(self):
+        """api_key=None이면 환경 설정 키를 사용해야 한다."""
+        with patch("src.llm.openai.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(OPENAI_API_KEY="env-key")
+            with patch("src.llm.openai.AsyncOpenAI") as mock_openai:
+                OpenAIClient(model="gpt-4o", api_key=None)
+                mock_openai.assert_called_once_with(api_key="env-key")
+
+
 class TestOpenAIClientListModels:
     """OpenAI list_models 테스트."""
 
