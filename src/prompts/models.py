@@ -3,7 +3,7 @@ from enum import Enum
 from typing import ClassVar
 from uuid import UUID
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -34,6 +34,10 @@ class PromptVersion(SQLModel, table=True):
     """프롬프트 버전 - 불변성 유지, 실제 실험체."""
 
     __tablename__: ClassVar[str] = "prompt_versions"
+
+    __table_args__ = (
+        UniqueConstraint("prompt_id", "version_number", name="uq_prompt_version"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     prompt_id: int = Field(foreign_key="prompts.id", index=True)
