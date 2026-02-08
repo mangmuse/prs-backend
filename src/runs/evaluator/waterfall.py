@@ -3,10 +3,11 @@ import logging
 from src.common.types import LogicConstraint
 from src.prompts.models import OutputSchemaType
 from src.runs.evaluator.format_layer import check_format
-from src.runs.evaluator.logic_layer import FieldValue, check_logic
+from src.runs.evaluator.constraint_layer import FieldValue, check_constraints
 from src.runs.evaluator.semantic_layer import check_semantic
 from src.runs.models import ResultStatus
 from src.runs.schemas import (
+    ConstraintLayerResult,
     FormatCheckResult,
     WaterfallResult,
 )
@@ -64,22 +65,22 @@ def evaluate_waterfall(
             semantic_result=semantic_result,
         )
 
-    # Layer 3: Logic Check
+    # Layer 3: Constraint Check
     parsed_output = _get_parsed_output(format_result)
-    logic_result = check_logic(parsed_output, constraints)
+    constraint_result = check_constraints(parsed_output, constraints)
     logger.info(
-        "Layer3 Logic | passed=%s, results=%s",
-        logic_result.passed,
-        [r.model_dump() for r in (logic_result.results or [])],
+        "Layer3 Constraint | passed=%s, results=%s",
+        constraint_result.passed,
+        [r.model_dump() for r in (constraint_result.results or [])],
     )
 
-    if not logic_result.passed:
-        logger.info("Waterfall 종료 | status=LOGIC (Layer3에서 실패)")
+    if not constraint_result.passed:
+        logger.info("Waterfall 종료 | status=CONSTRAINT (Layer3에서 실패)")
         return WaterfallResult(
-            status=ResultStatus.LOGIC,
+            status=ResultStatus.CONSTRAINT,
             format_result=format_result,
             semantic_result=semantic_result,
-            logic_result=logic_result,
+            constraint_result=constraint_result,
         )
 
     # All passed
@@ -88,7 +89,7 @@ def evaluate_waterfall(
         status=ResultStatus.PASS,
         format_result=format_result,
         semantic_result=semantic_result,
-        logic_result=logic_result,
+        constraint_result=constraint_result,
     )
 
 

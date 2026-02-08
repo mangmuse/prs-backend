@@ -22,7 +22,7 @@ class ResultStatus(str, Enum):
     PASS = "pass"
     FORMAT = "format"
     SEMANTIC = "semantic"
-    LOGIC = "logic"
+    CONSTRAINT = "constraint"
 
 
 class Run(SQLModel, table=True):
@@ -66,8 +66,8 @@ class RunResult(SQLModel, table=True):
     # Layer 2: Semantic Score
     semantic_score: float = Field(default=0.0)
 
-    # Layer 3: Logic Results
-    logic_results: dict[str, Any] = Field(default={}, sa_column=Column(JSONB))
+    # Layer 3: Constraint Results
+    constraint_results: dict[str, Any] = Field(default={}, sa_column=Column(JSONB))
 
     status: ResultStatus = Field(index=True)
 

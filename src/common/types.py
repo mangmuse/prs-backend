@@ -1,13 +1,15 @@
 """PRS 백엔드 공통 타입 정의."""
 
 from enum import StrEnum
-from typing import TypedDict
+from typing import Annotated, Literal, TypedDict
+
+from pydantic import BaseModel, Field
 
 type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 
 
 class ConstraintType(StrEnum):
-    """Logic Layer constraint 타입."""
+    """Constraint Layer constraint 타입."""
 
     CONTAINS = "contains"
     NOT_CONTAINS = "not_contains"
@@ -16,30 +18,62 @@ class ConstraintType(StrEnum):
     MAX_LENGTH = "max_length"
 
 
+class ContainsConstraint(BaseModel):
+    """contains: target 필드에 value가 포함되어야 함."""
+
+    type: Literal["contains"]
+    target: str
+    value: str
+
+
+class NotContainsConstraint(BaseModel):
+    """not_contains: target 필드에 value가 포함되지 않아야 함."""
+
+    type: Literal["not_contains"]
+    target: str
+    value: str
+
+
+class RangeConstraint(BaseModel):
+    """range: target 필드의 숫자 값이 min/max 범위 내여야 함."""
+
+    type: Literal["range"]
+    target: str
+    min: float | None = None
+    max: float | None = None
+
+
+class RegexConstraint(BaseModel):
+    """regex: target 필드가 pattern과 일치해야 함."""
+
+    type: Literal["regex"]
+    target: str
+    pattern: str
+
+
+class MaxLengthConstraint(BaseModel):
+    """max_length: target 필드의 길이가 max 이하여야 함."""
+
+    type: Literal["max_length"]
+    target: str
+    max: int
+
+
+LogicConstraint = Annotated[
+    ContainsConstraint
+    | NotContainsConstraint
+    | RangeConstraint
+    | RegexConstraint
+    | MaxLengthConstraint,
+    Field(discriminator="type"),
+]
+
+
 class HealthResponse(TypedDict):
     """헬스 체크 엔드포인트 응답."""
 
     status: str
     timestamp: str
-
-
-class LogicConstraint(TypedDict, total=False):
-    """데이터셋 행 및 평가 프로필용 로직 제약조건 정의.
-
-    타입:
-    - contains: 대상 필드에 값이 포함되어야 함
-    - not_contains: 대상 필드에 값이 포함되지 않아야 함
-    - range: 대상 필드의 숫자 값이 min/max 범위 내여야 함
-    - regex: 대상 필드가 패턴과 일치해야 함
-    - max_length: 대상 필드가 값 길이를 초과하지 않아야 함
-    """
-
-    type: str
-    target: str
-    value: str | int | float
-    min: float | None
-    max: float | None
-    pattern: str | None
 
 
 class LogicCheckResult(TypedDict):

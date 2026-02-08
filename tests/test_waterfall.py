@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from src.common.types import LogicConstraint
+from src.common.types import ContainsConstraint
 from src.prompts.models import OutputSchemaType
 from src.runs.evaluator.waterfall import evaluate_waterfall
 from src.runs.models import ResultStatus
@@ -10,7 +10,7 @@ class TestWaterfallFormatFail:
     """Format 단계 실패 시 fail-fast"""
 
     def test_format_fail_returns_format_status(self):
-        """Format 실패 시 status=format, semantic/logic 실행 안 함"""
+        """Format 실패 시 status=format, semantic/constraint 실행 안 함"""
         result = evaluate_waterfall(
             raw_output="invalid json",
             output_schema=OutputSchemaType.JSON_OBJECT,
@@ -22,7 +22,7 @@ class TestWaterfallFormatFail:
         assert result.status == ResultStatus.FORMAT
         assert result.format_result.passed is False
         assert result.semantic_result is None
-        assert result.logic_result is None
+        assert result.constraint_result is None
 
 
 class TestWaterfallSemanticFail:
@@ -30,7 +30,7 @@ class TestWaterfallSemanticFail:
 
     @patch("src.runs.evaluator.semantic_layer.get_embedding")
     def test_semantic_fail_returns_semantic_status(self, mock_embedding):
-        """Semantic 실패 시 status=semantic, logic 실행 안 함"""
+        """Semantic 실패 시 status=semantic, constraint 실행 안 함"""
         mock_embedding.side_effect = [
             [1.0, 0.0, 0.0],
             [0.0, 1.0, 0.0],
@@ -48,19 +48,19 @@ class TestWaterfallSemanticFail:
         assert result.format_result.passed is True
         assert result.semantic_result is not None
         assert result.semantic_result.passed is False
-        assert result.logic_result is None
+        assert result.constraint_result is None
 
 
-class TestWaterfallLogicFail:
-    """Logic 단계 실패 시"""
+class TestWaterfallConstraintFail:
+    """Constraint 단계 실패 시"""
 
     @patch("src.runs.evaluator.semantic_layer.get_embedding")
-    def test_logic_fail_returns_logic_status(self, mock_embedding):
-        """Logic 실패 시 status=logic"""
+    def test_constraint_fail_returns_logic_status(self, mock_embedding):
+        """Constraint 실패 시 status=constraint"""
         mock_embedding.return_value = [1.0, 0.0, 0.0]
 
-        constraints: list[LogicConstraint] = [
-            {"type": "contains", "target": "verdict", "value": "TRUE"}
+        constraints = [
+            ContainsConstraint(type="contains", target="verdict", value="TRUE")
         ]
 
         result = evaluate_waterfall(
@@ -71,12 +71,12 @@ class TestWaterfallLogicFail:
             constraints=constraints,
         )
 
-        assert result.status == ResultStatus.LOGIC
+        assert result.status == ResultStatus.CONSTRAINT
         assert result.format_result.passed is True
         assert result.semantic_result is not None
         assert result.semantic_result.passed is True
-        assert result.logic_result is not None
-        assert result.logic_result.passed is False
+        assert result.constraint_result is not None
+        assert result.constraint_result.passed is False
 
 
 class TestWaterfallPass:
@@ -87,8 +87,8 @@ class TestWaterfallPass:
         """모든 레이어 통과 시 status=pass"""
         mock_embedding.return_value = [1.0, 0.0, 0.0]
 
-        constraints: list[LogicConstraint] = [
-            {"type": "contains", "target": "verdict", "value": "TRUE"}
+        constraints = [
+            ContainsConstraint(type="contains", target="verdict", value="TRUE")
         ]
 
         result = evaluate_waterfall(
@@ -103,8 +103,8 @@ class TestWaterfallPass:
         assert result.format_result.passed is True
         assert result.semantic_result is not None
         assert result.semantic_result.passed is True
-        assert result.logic_result is not None
-        assert result.logic_result.passed is True
+        assert result.constraint_result is not None
+        assert result.constraint_result.passed is True
 
 
 class TestWaterfallFreeform:

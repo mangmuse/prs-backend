@@ -25,7 +25,7 @@ class ConstraintResult(CamelCaseModel):
     message: str | None = None
 
 
-class LogicLayerResult(CamelCaseModel):
+class ConstraintLayerResult(CamelCaseModel):
     passed: bool
     results: list[ConstraintResult] = []
     error_message: str | None = None
@@ -37,7 +37,7 @@ class WaterfallResult(CamelCaseModel):
     status: ResultStatus
     format_result: FormatCheckResult
     semantic_result: SemanticCheckResult | None = None
-    logic_result: LogicLayerResult | None = None
+    constraint_result: ConstraintLayerResult | None = None
 
 
 class CreateRunRequest(CamelCaseModel):
@@ -73,7 +73,7 @@ class RunSummaryResponse(CamelCaseModel):
     avg_semantic: float | None
     format_pass_rate: float | None
     semantic_pass_rate: float | None
-    logic_pass_rate: float | None
+    constraint_pass_rate: float | None
     total_rows: int
     created_at: datetime
 
@@ -94,7 +94,7 @@ class RunMetrics(CamelCaseModel):
     avg_semantic: float
     format_pass_rate: float
     semantic_pass_rate: float
-    logic_pass_rate: float
+    constraint_pass_rate: float
 
 
 class AssembledPrompt(CamelCaseModel):
@@ -116,7 +116,7 @@ class RunResultResponse(CamelCaseModel):
     status: ResultStatus
     is_format_passed: bool
     semantic_score: float
-    logic_results: dict[str, JsonValue]
+    constraint_results: dict[str, JsonValue]
     raw_output: str
     parsed_output: dict[str, JsonValue] | None
 
