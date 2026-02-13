@@ -63,14 +63,14 @@ async def test_run_성공_플로우_json_object(
     ):
         await execute_run(run_id)
 
-    list_response = await client.get("/runs", cookies=guest_cookies)
+    list_response = await client.get("/runs")
     assert list_response.status_code == 200
     runs = list_response.json()
     run_summary = next((r for r in runs if r["id"] == run_id), None)
     assert run_summary is not None
     assert run_summary["status"] == "completed"
 
-    response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
+    response = await client.get(f"/runs/{run_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["metrics"]["passRate"] == 1.0
@@ -136,14 +136,14 @@ async def test_run_semantic_실패_플로우(
     ):
         await execute_run(run_id)
 
-    list_response = await client.get("/runs", cookies=guest_cookies)
+    list_response = await client.get("/runs")
     assert list_response.status_code == 200
     runs = list_response.json()
     run_summary = next((r for r in runs if r["id"] == run_id), None)
     assert run_summary is not None
     assert run_summary["status"] == "completed"
 
-    response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
+    response = await client.get(f"/runs/{run_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["metrics"]["passRate"] == 0.0

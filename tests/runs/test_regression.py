@@ -42,7 +42,6 @@ async def test_compare_runs_not_found(
     """존재하지 않는 Run 비교 시 404."""
     response = await client.get(
         "/runs/99999/compare/99998",
-        cookies=guest_cookies,
     )
     assert response.status_code == 404
 
@@ -104,7 +103,6 @@ async def test_compare_runs_returns_row_comparisons(
             "systemInstruction": "수정된 시스템 지시문",
             "userTemplate": "{{claim}}",
         },
-        cookies=guest_cookies,
     )
     version2_id = version2_resp.json()["id"]
 
@@ -135,7 +133,6 @@ async def test_compare_runs_returns_row_comparisons(
 
     response = await client.get(
         f"/runs/{run2_id}/compare/{run1_id}",
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 200

@@ -14,7 +14,6 @@ async def test_create_profile(
             "description": "높은 threshold",
             "semanticThreshold": 0.9,
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -38,7 +37,6 @@ async def test_create_profile_with_constraints(
                 {"type": "max_length", "target": "reasoning", "max": 500},
             ],
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -59,15 +57,13 @@ async def test_list_profiles(
                 {"type": "contains", "target": "verdict", "value": "test"}
             ],
         },
-        cookies=guest_cookies,
     )
     await client.post(
         "/evaluator-profiles",
         json={"name": "프로필2"},
-        cookies=guest_cookies,
     )
 
-    response = await client.get("/evaluator-profiles", cookies=guest_cookies)
+    response = await client.get("/evaluator-profiles")
 
     assert response.status_code == 200
     data = response.json()
@@ -88,11 +84,10 @@ async def test_get_profile_detail(
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "상세조회용", "semanticThreshold": 0.75},
-        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
-    response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
+    response = await client.get(f"/evaluator-profiles/{profile_id}")
 
     assert response.status_code == 200
     assert response.json()["name"] == "상세조회용"
@@ -106,14 +101,12 @@ async def test_update_profile(
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "수정전"},
-        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
     response = await client.patch(
         f"/evaluator-profiles/{profile_id}",
         json={"name": "수정후", "semanticThreshold": 0.8},
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 200
@@ -129,14 +122,13 @@ async def test_delete_profile(
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "삭제용"},
-        cookies=guest_cookies,
     )
     profile_id = create_response.json()["id"]
 
-    response = await client.delete(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
+    response = await client.delete(f"/evaluator-profiles/{profile_id}")
     assert response.status_code == 204
 
-    get_response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=guest_cookies)
+    get_response = await client.get(f"/evaluator-profiles/{profile_id}")
     assert get_response.status_code == 404
 
 
@@ -144,18 +136,17 @@ async def test_delete_profile(
 async def test_profile_ownership(client: AsyncClient) -> None:
     """다른 사용자의 프로필 접근 불가."""
     guest1_resp = await client.post("/auth/guest")
-    cookies1 = {"guest_id": guest1_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest1_resp.json()["guestId"])
 
     create_response = await client.post(
         "/evaluator-profiles",
         json={"name": "Guest1 프로필"},
-        cookies=cookies1,
     )
     profile_id = create_response.json()["id"]
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest2_resp.json()["guestId"])
 
-    response = await client.get(f"/evaluator-profiles/{profile_id}", cookies=cookies2)
+    response = await client.get(f"/evaluator-profiles/{profile_id}")
     assert response.status_code == 404

@@ -10,7 +10,6 @@ async def test_create_prompt(
     response = await client.post(
         "/prompts",
         json={"name": "팩트체커", "description": "사실 여부 판단용 프롬프트"},
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -28,7 +27,6 @@ async def test_list_prompts_with_version_count(
     create_resp = await client.post(
         "/prompts",
         json={"name": "테스트 프롬프트"},
-        cookies=guest_cookies,
     )
     prompt_id = create_resp.json()["id"]
 
@@ -38,10 +36,9 @@ async def test_list_prompts_with_version_count(
             "systemInstruction": "당신은 도우미입니다.",
             "userTemplate": "{{input}}을 처리하세요.",
         },
-        cookies=guest_cookies,
     )
 
-    response = await client.get("/prompts", cookies=guest_cookies)
+    response = await client.get("/prompts")
 
     assert response.status_code == 200
     prompts = response.json()
@@ -60,7 +57,6 @@ async def test_create_version_auto_increment(
     prompt_resp = await client.post(
         "/prompts",
         json={"name": "버전 테스트"},
-        cookies=guest_cookies,
     )
     prompt_id = prompt_resp.json()["id"]
 
@@ -71,7 +67,6 @@ async def test_create_version_auto_increment(
             "userTemplate": "v1 유저",
             "memo": "첫 버전",
         },
-        cookies=guest_cookies,
     )
     assert v1.status_code == 201
     assert v1.json()["versionNumber"] == 1
@@ -83,7 +78,6 @@ async def test_create_version_auto_increment(
             "userTemplate": "v2 유저",
             "memo": "두번째 버전",
         },
-        cookies=guest_cookies,
     )
     assert v2.status_code == 201
     assert v2.json()["versionNumber"] == 2
@@ -97,7 +91,6 @@ async def test_get_version_detail(
     prompt_resp = await client.post(
         "/prompts",
         json={"name": "상세 조회 테스트"},
-        cookies=guest_cookies,
     )
     prompt_id = prompt_resp.json()["id"]
 
@@ -109,13 +102,11 @@ async def test_get_version_detail(
             "model": "gpt-4",
             "temperature": 0.7,
         },
-        cookies=guest_cookies,
     )
     version_id = ver_resp.json()["id"]
 
     response = await client.get(
         f"/prompts/{prompt_id}/versions/{version_id}",
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 200
@@ -134,7 +125,6 @@ async def test_list_versions(
     prompt_resp = await client.post(
         "/prompts",
         json={"name": "히스토리 테스트"},
-        cookies=guest_cookies,
     )
     prompt_id = prompt_resp.json()["id"]
 
@@ -145,10 +135,9 @@ async def test_list_versions(
                 "systemInstruction": f"시스템 {i}",
                 "userTemplate": f"유저 {i}",
             },
-            cookies=guest_cookies,
         )
 
-    response = await client.get(f"/prompts/{prompt_id}/versions", cookies=guest_cookies)
+    response = await client.get(f"/prompts/{prompt_id}/versions")
 
     assert response.status_code == 200
     versions = response.json()
@@ -161,19 +150,18 @@ async def test_list_versions(
 async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None:
     """다른 사용자 프롬프트 접근 시 404."""
     guest1_resp = await client.post("/auth/guest")
-    cookies1 = {"guest_id": guest1_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest1_resp.json()["guestId"])
 
     prompt_resp = await client.post(
         "/prompts",
         json={"name": "비밀 프롬프트"},
-        cookies=cookies1,
     )
     prompt_id = prompt_resp.json()["id"]
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest2_resp.json()["guestId"])
 
-    response = await client.get(f"/prompts/{prompt_id}/versions", cookies=cookies2)
+    response = await client.get(f"/prompts/{prompt_id}/versions")
 
     assert response.status_code == 404

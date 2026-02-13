@@ -24,7 +24,8 @@ async def test_existing_cookie_returns_same_guest(client: AsyncClient) -> None:
     response1 = await client.post("/auth/guest")
     guest_id1 = response1.json()["guestId"]
 
-    response2 = await client.post("/auth/guest", cookies={"guest_id": guest_id1})
+    client.cookies.set("guest_id", guest_id1)
+    response2 = await client.post("/auth/guest")
     guest_id2 = response2.json()["guestId"]
 
     assert guest_id1 == guest_id2
@@ -34,7 +35,8 @@ async def test_existing_cookie_returns_same_guest(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_invalid_cookie_creates_new_guest(client: AsyncClient) -> None:
     """POST /auth/guest - 유효하지 않은 Cookie는 새 세션 생성"""
-    response = await client.post("/auth/guest", cookies={"guest_id": "invalid-uuid"})
+    client.cookies.set("guest_id", "invalid-uuid")
+    response = await client.post("/auth/guest")
     assert response.status_code == 200
 
     data = response.json()
@@ -46,7 +48,8 @@ async def test_invalid_cookie_creates_new_guest(client: AsyncClient) -> None:
 async def test_nonexistent_guest_cookie_creates_new_guest(client: AsyncClient) -> None:
     """POST /auth/guest - DB에 없는 guest_id Cookie는 새 세션 생성"""
     fake_uuid = "00000000-0000-0000-0000-000000000000"
-    response = await client.post("/auth/guest", cookies={"guest_id": fake_uuid})
+    client.cookies.set("guest_id", fake_uuid)
+    response = await client.post("/auth/guest")
     assert response.status_code == 200
 
     data = response.json()

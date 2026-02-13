@@ -27,7 +27,6 @@ async def test_create_run_returns_201_and_running_status(
             "datasetId": dataset.id,
             "profileId": profile.id,
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 201
@@ -56,7 +55,6 @@ async def test_create_run_with_invalid_version_returns_404(
             "datasetId": dataset.id,
             "profileId": profile.id,
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 404
@@ -68,12 +66,11 @@ async def test_create_run_with_other_user_resource_returns_404(
 ) -> None:
     """다른 사용자의 리소스로 Run 생성 시 404."""
     guest1_resp = await client.post("/auth/guest")
-    cookies1 = {"guest_id": guest1_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest1_resp.json()["guestId"])
 
     prompt_resp = await client.post(
         "/prompts",
         json={"name": "Guest1 프롬프트"},
-        cookies=cookies1,
     )
     prompt_id = prompt_resp.json()["id"]
 
@@ -83,27 +80,24 @@ async def test_create_run_with_other_user_resource_returns_404(
             "systemInstruction": "테스트",
             "userTemplate": "{{input}}",
         },
-        cookies=cookies1,
     )
     version_id = version_resp.json()["id"]
 
     dataset_resp = await client.post(
         "/datasets",
         json={"name": "Guest1 데이터셋"},
-        cookies=cookies1,
     )
     dataset_id = dataset_resp.json()["id"]
 
     profile_resp = await client.post(
         "/evaluator-profiles",
         json={"name": "Guest1 프로필"},
-        cookies=cookies1,
     )
     profile_id = profile_resp.json()["id"]
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest2_resp.json()["guestId"])
 
     response = await client.post(
         "/runs",
@@ -112,7 +106,6 @@ async def test_create_run_with_other_user_resource_returns_404(
             "datasetId": dataset_id,
             "profileId": profile_id,
         },
-        cookies=cookies2,
     )
 
     assert response.status_code == 404
@@ -124,7 +117,7 @@ async def test_list_runs_returns_empty_initially(
     guest_cookies: dict[str, str],
 ) -> None:
     """초기 Run 목록은 비어있음."""
-    response = await client.get("/runs", cookies=guest_cookies)
+    response = await client.get("/runs")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -136,7 +129,7 @@ async def test_get_run_not_found(
     guest_cookies: dict[str, str],
 ) -> None:
     """존재하지 않는 Run 조회 시 404."""
-    response = await client.get("/runs/99999", cookies=guest_cookies)
+    response = await client.get("/runs/99999")
 
     assert response.status_code == 404
 
@@ -192,7 +185,7 @@ async def test_list_runs_includes_layer_metrics(
     ):
         await execute_run(run_id)
 
-    response = await client.get("/runs", cookies=guest_cookies)
+    response = await client.get("/runs")
 
     assert response.status_code == 200
     runs = response.json()
@@ -257,7 +250,7 @@ async def test_get_run_detail_includes_layer_metrics(
     ):
         await execute_run(run_id)
 
-    response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
+    response = await client.get(f"/runs/{run_id}")
 
     assert response.status_code == 200
     data = response.json()
@@ -310,12 +303,11 @@ async def test_update_profile_snapshot_returns_204(
                 {"type": "contains", "target": "verdict", "value": "TRUE"},
             ],
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 204
 
-    detail_response = await client.get(f"/runs/{run_id}", cookies=guest_cookies)
+    detail_response = await client.get(f"/runs/{run_id}")
     detail = detail_response.json()
     assert detail["profile"]["semanticThreshold"] == 0.85
     assert len(detail["profile"]["globalConstraints"]) == 1
@@ -334,7 +326,6 @@ async def test_update_profile_snapshot_not_found(
             "semanticThreshold": 0.85,
             "globalConstraints": [],
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 404
@@ -373,7 +364,7 @@ async def test_update_profile_snapshot_other_user_returns_404(
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest2_resp.json()["guestId"])
 
     response = await client.patch(
         f"/runs/{run_id}/profile-snapshot",
@@ -381,7 +372,6 @@ async def test_update_profile_snapshot_other_user_returns_404(
             "semanticThreshold": 0.85,
             "globalConstraints": [],
         },
-        cookies=cookies2,
     )
 
     assert response.status_code == 404
@@ -443,7 +433,6 @@ async def test_re_evaluate_returns_200_with_results(
             "semanticThreshold": 0.99,
             "globalConstraints": [],
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 200
@@ -468,7 +457,6 @@ async def test_re_evaluate_not_found(
             "semanticThreshold": 0.85,
             "globalConstraints": [],
         },
-        cookies=guest_cookies,
     )
 
     assert response.status_code == 404
@@ -507,7 +495,7 @@ async def test_re_evaluate_other_user_returns_404(
 
     client.cookies.clear()
     guest2_resp = await client.post("/auth/guest")
-    cookies2 = {"guest_id": guest2_resp.json()["guestId"]}
+    client.cookies.set("guest_id", guest2_resp.json()["guestId"])
 
     response = await client.post(
         f"/runs/{run_id}/re-evaluate",
@@ -515,7 +503,6 @@ async def test_re_evaluate_other_user_returns_404(
             "semanticThreshold": 0.85,
             "globalConstraints": [],
         },
-        cookies=cookies2,
     )
 
     assert response.status_code == 404
