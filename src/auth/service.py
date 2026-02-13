@@ -1,15 +1,22 @@
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID
 
 from joserfc import jwt as jose_jwt
 from joserfc.jwk import OctKey
 from joserfc.jwt import JWTClaimsRegistry
+from sqlalchemy import update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
-from src.auth.models import User
+from src.auth.models import Guest, User
 from src.auth.schemas import TokenPayload
 from src.config import get_settings
+from src.datasets.models import Dataset
+from src.profiles.models import EvaluatorProfile
+from src.prompts.models import Prompt
+from src.runs.models import Run
 
 settings = get_settings()
 
@@ -132,3 +139,36 @@ async def find_or_create_user(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def migrate_guest_to_user(
+    session: AsyncSession,
+    guest_id: UUID,
+    user_id: int,
+) -> dict[str, int]:
+    """게스트 데이터를 회원으로 이전.
+
+    4개 테이블의 guest_id를 user_id로 전환하고 Guest 레코드를 삭제합니다.
+    """
+    counts: dict[str, int] = {}
+
+    for model, key in [
+        (Dataset, "datasets"),
+        (Prompt, "prompts"),
+        (EvaluatorProfile, "profiles"),
+        (Run, "runs"),
+    ]:
+        result = await session.execute(
+            update(model)
+            .where(col(model.guest_id) == guest_id)  # type: ignore[arg-type]
+            .values(user_id=user_id, guest_id=None)
+        )
+        cursor_result = cast(CursorResult, result)
+        counts[key] = cursor_result.rowcount
+
+    guest_result = await session.execute(select(Guest).where(col(Guest.id) == guest_id))
+    guest = guest_result.scalar_one_or_none()
+    if guest:
+        await session.delete(guest)
+
+    return counts

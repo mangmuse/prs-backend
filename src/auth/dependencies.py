@@ -30,7 +30,7 @@ async def get_current_identity(
     if credentials:
         token_data = service.decode_token(credentials.credentials)
         if token_data is None:
-            raise UnauthorizedError("Invalid or expired token")
+            raise UnauthorizedError("유효하지 않거나 만료된 토큰입니다")
 
         if token_data.type == "user":
             user_id = int(token_data.sub)
@@ -39,9 +39,9 @@ async def get_current_identity(
             user = user_result.scalar_one_or_none()
             if user:
                 return user
-            raise UnauthorizedError("User not found")
+            raise UnauthorizedError("사용자를 찾을 수 없습니다")
 
-        raise UnauthorizedError("Invalid token type")
+        raise UnauthorizedError("유효하지 않은 토큰 타입입니다")
 
     guest_id_cookie = request.cookies.get("guest_id")
     if guest_id_cookie:
@@ -55,7 +55,7 @@ async def get_current_identity(
         except ValueError:
             pass
 
-    raise UnauthorizedError("Missing authentication")
+    raise UnauthorizedError("인증 정보가 없습니다")
 
 
 async def get_current_guest(
@@ -63,5 +63,14 @@ async def get_current_guest(
 ) -> Guest:
     """Guest만 허용하는 엔드포인트용 의존성."""
     if not isinstance(identity, Guest):
-        raise UnauthorizedError("Guest access required")
+        raise UnauthorizedError("게스트 접근만 허용됩니다")
+    return identity
+
+
+async def get_current_user(
+    identity: Guest | User = Depends(get_current_identity),
+) -> User:
+    """User만 허용하는 엔드포인트용 의존성."""
+    if not isinstance(identity, User):
+        raise UnauthorizedError("회원 인증이 필요합니다")
     return identity

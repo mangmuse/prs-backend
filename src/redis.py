@@ -1,8 +1,12 @@
+import json
+import logging
 import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import Request
 from redis.asyncio import Redis
+
+logger = logging.getLogger(__name__)
 
 TEMP_CODE_TTL_SECONDS = 60
 
@@ -12,13 +16,22 @@ async def get_redis(request: Request) -> AsyncGenerator[Redis, None]:
     yield request.app.state.redis
 
 
-async def store_temp_code(redis: Redis, access_token: str) -> str:
+async def store_temp_code(
+    redis: Redis, access_token: str, *, was_guest: bool = False
+) -> str:
     code = str(uuid.uuid4())
-    await redis.set(f"temp_code:{code}", access_token, ex=TEMP_CODE_TTL_SECONDS)
+    payload = json.dumps({"access_token": access_token, "was_guest": was_guest})
+    await redis.set(f"temp_code:{code}", payload, ex=TEMP_CODE_TTL_SECONDS)
     return code
 
 
-async def retrieve_temp_code(redis: Redis, code: str) -> str | None:
+async def retrieve_temp_code(redis: Redis, code: str) -> dict[str, str | bool] | None:
     key = f"temp_code:{code}"
     value: str | None = await redis.getdel(key)
-    return value
+    if value is None:
+        return None
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        logger.warning("Redis 임시코드 JSON 파싱 실패: key=%s", key)
+        return None

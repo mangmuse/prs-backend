@@ -33,9 +33,28 @@ class TokenResponse(CamelCaseModel):
     """FE에 반환하는 access token 응답"""
 
     access_token: str
+    was_guest: bool = False
 
 
 class TokenExchangeRequest(CamelCaseModel):
     """임시코드 교환 요청 (Redis에서 access token 가져올 때)"""
 
     code: str
+
+
+class UserResponse(CamelCaseModel):
+    """사용자 정보 응답"""
+
+    id: int
+    email: str
+    name: str | None
+    picture_url: str | None
+
+
+class MigrateResponse(CamelCaseModel):
+    """게스트 → 회원 마이그레이션 결과"""
+
+    datasets: int
+    prompts: int
+    profiles: int
+    runs: int

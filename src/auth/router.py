@@ -8,10 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.auth import service
-from src.auth.models import Guest
+from src.auth.dependencies import get_current_user
+from src.auth.models import Guest, User
 from src.auth.oauth import oauth
-from src.auth.schemas import GuestSessionResponse, TokenExchangeRequest, TokenResponse
-from src.common.exceptions import BadRequestError, UnauthorizedError
+from src.auth.schemas import (
+    GuestSessionResponse,
+    MigrateResponse,
+    TokenExchangeRequest,
+    TokenResponse,
+    UserResponse,
+)
+from src.common.exceptions import BadRequestError, NotFoundError, UnauthorizedError
 from src.config import get_settings
 from src.database import get_session
 from src.redis import get_redis, retrieve_temp_code, store_temp_code
@@ -157,7 +164,9 @@ async def google_callback(
     access_token, _ = service.create_access_token(user.id, "user")
     refresh_token, _ = service.create_refresh_token(user.id, "user")
 
-    temp_code = await store_temp_code(redis, access_token)
+    guest_id_cookie = request.cookies.get("guest_id")
+    was_guest = guest_id_cookie is not None
+    temp_code = await store_temp_code(redis, access_token, was_guest=was_guest)
 
     redirect_url = f"{settings.FRONTEND_URL}/auth/callback?code={temp_code}"
     response = RedirectResponse(url=redirect_url, status_code=302)
@@ -185,8 +194,89 @@ async def exchange_token(
     redis: Redis = Depends(get_redis),
 ) -> TokenResponse:
     """임시코드 → Access Token 교환 (1회용)."""
-    access_token = await retrieve_temp_code(redis, body.code)
-    if access_token is None:
+    payload = await retrieve_temp_code(redis, body.code)
+    if payload is None:
         raise UnauthorizedError("유효하지 않은 인증 코드입니다")
 
-    return TokenResponse(access_token=access_token)
+    return TokenResponse(
+        access_token=str(payload["access_token"]),
+        was_guest=bool(payload.get("was_guest", False)),
+    )
+
+
+@router.post(
+    "/logout",
+    status_code=204,
+    summary="로그아웃",
+    description="refresh_token, guest_id 쿠키를 삭제합니다.",
+)
+async def logout(
+    response: Response,
+) -> None:
+    """로그아웃 - HttpOnly 쿠키 삭제."""
+    response.delete_cookie(
+        key="refresh_token",
+        path="/auth",
+        httponly=True,
+        secure=settings.REFRESH_COOKIE_SECURE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        key="guest_id",
+        path="/",
+        httponly=True,
+        samesite="lax",
+    )
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="현재 사용자 정보 조회",
+    description="Bearer Token으로 인증된 사용자 정보를 반환합니다.",
+)
+async def get_me(user: User = Depends(get_current_user)) -> UserResponse:
+    """현재 인증된 사용자 정보 반환."""
+    assert user.id is not None
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        picture_url=user.picture_url,
+    )
+
+
+@router.post(
+    "/migrate",
+    response_model=MigrateResponse,
+    summary="게스트 → 회원 데이터 마이그레이션",
+    description="게스트 소유 자산을 로그인한 회원으로 이전합니다.",
+)
+async def migrate_guest_data(
+    request: Request,
+    response: Response,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> MigrateResponse:
+    """게스트 데이터를 회원으로 이전."""
+    guest_id_cookie = request.cookies.get("guest_id")
+    if not guest_id_cookie:
+        raise BadRequestError("게스트 세션 정보가 없습니다")
+
+    try:
+        guest_uuid = UUID(guest_id_cookie)
+    except ValueError:
+        raise BadRequestError("유효하지 않은 게스트 ID입니다")
+
+    guest_result = await session.execute(select(Guest).where(Guest.id == guest_uuid))
+    guest = guest_result.scalar_one_or_none()
+    if not guest:
+        raise NotFoundError("존재하지 않는 게스트입니다")
+
+    assert user.id is not None
+    counts = await service.migrate_guest_to_user(session, guest_uuid, user.id)
+    await session.commit()
+
+    response.delete_cookie("guest_id", path="/")
+
+    return MigrateResponse(**counts)
