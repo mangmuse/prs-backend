@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator
 
 import fakeredis.aioredis
@@ -37,13 +38,15 @@ async def test_exchange_valid_code(
     client: AsyncClient, fake_redis: fakeredis.aioredis.FakeRedis
 ) -> None:
     """유효한 임시코드 → 200, access_token 반환."""
-    await fake_redis.set("temp_code:test-uuid-123", "jwt-access-token-here", ex=60)
+    payload = json.dumps({"access_token": "jwt-access-token-here", "was_guest": False})
+    await fake_redis.set("temp_code:test-uuid-123", payload, ex=60)
 
     response = await client.post("/auth/token", json={"code": "test-uuid-123"})
 
     assert response.status_code == 200
     data = response.json()
     assert data["accessToken"] == "jwt-access-token-here"
+    assert data["wasGuest"] is False
 
 
 @pytest.mark.asyncio
@@ -60,7 +63,8 @@ async def test_exchange_code_is_one_time(
     client: AsyncClient, fake_redis: fakeredis.aioredis.FakeRedis
 ) -> None:
     """임시코드는 1회용 - 두 번째 사용 시 401."""
-    await fake_redis.set("temp_code:one-time-code", "jwt-token", ex=60)
+    payload = json.dumps({"access_token": "jwt-token", "was_guest": False})
+    await fake_redis.set("temp_code:one-time-code", payload, ex=60)
 
     first = await client.post("/auth/token", json={"code": "one-time-code"})
     assert first.status_code == 200
@@ -75,3 +79,35 @@ async def test_exchange_missing_code(client: AsyncClient) -> None:
     response = await client.post("/auth/token", json={})
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_exchange_returns_was_guest_true(
+    client: AsyncClient, fake_redis: fakeredis.aioredis.FakeRedis
+) -> None:
+    """was_guest=True인 payload → wasGuest=true 반환."""
+    payload = json.dumps({"access_token": "jwt-token-here", "was_guest": True})
+    await fake_redis.set("temp_code:guest-code-123", payload, ex=60)
+
+    response = await client.post("/auth/token", json={"code": "guest-code-123"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["accessToken"] == "jwt-token-here"
+    assert data["wasGuest"] is True
+
+
+@pytest.mark.asyncio
+async def test_exchange_returns_was_guest_false(
+    client: AsyncClient, fake_redis: fakeredis.aioredis.FakeRedis
+) -> None:
+    """was_guest=False인 payload → wasGuest=false 반환."""
+    payload = json.dumps({"access_token": "jwt-token-here", "was_guest": False})
+    await fake_redis.set("temp_code:no-guest-code-456", payload, ex=60)
+
+    response = await client.post("/auth/token", json={"code": "no-guest-code-456"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["accessToken"] == "jwt-token-here"
+    assert data["wasGuest"] is False

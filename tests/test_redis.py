@@ -32,7 +32,9 @@ async def test_retrieve_temp_code_returns_value(fake_redis) -> None:
     token = "my-access-token-123"
     code = await store_temp_code(fake_redis, token)
     result = await retrieve_temp_code(fake_redis, code)
-    assert result == token
+    assert result is not None
+    assert result["access_token"] == token
+    assert result["was_guest"] is False
 
 
 @pytest.mark.asyncio
@@ -41,7 +43,8 @@ async def test_retrieve_temp_code_is_one_time(fake_redis) -> None:
     code = await store_temp_code(fake_redis, "one-time-token")
 
     first = await retrieve_temp_code(fake_redis, code)
-    assert first == "one-time-token"
+    assert first is not None
+    assert first["access_token"] == "one-time-token"
 
     second = await retrieve_temp_code(fake_redis, code)
     assert second is None
