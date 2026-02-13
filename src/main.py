@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from redis.asyncio import Redis
+from starlette.middleware.sessions import SessionMiddleware
 
 from src.auth.router import router as auth_router
 from src.common.types import HealthResponse
@@ -25,14 +27,15 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
-    # Startup
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
     yield
-    # Shutdown
+    await app.state.redis.aclose()
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

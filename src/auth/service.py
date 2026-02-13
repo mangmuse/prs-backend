@@ -1,8 +1,13 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from jose import JWTError, jwt
+from joserfc import jwt as jose_jwt
+from joserfc.jwk import OctKey
+from joserfc.jwt import JWTClaimsRegistry
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
+from src.auth.models import User
 from src.auth.schemas import TokenPayload
 from src.config import get_settings
 
@@ -19,22 +24,48 @@ def create_access_token(
     Args:
         subject: guest_id 또는 user_id
         token_type: "guest" 또는 "user"
-        expires_delta: 만료 기간 (기본값: 30일)
+        expires_delta: 만료 기간 (기본값: 15분)
 
     Returns:
         (token, expires_at) 튜플
     """
     now = datetime.now(UTC)
-    expire = now + (expires_delta or timedelta(days=settings.ACCESS_TOKEN_EXPIRE_DAYS))
+    expire = now + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
 
-    payload = {
+    key = OctKey.import_key(settings.SECRET_KEY)
+    claims = {
         "sub": str(subject),
         "type": token_type,
-        "iat": now,
-        "exp": expire,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
     }
-    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jose_jwt.encode({"alg": settings.JWT_ALGORITHM}, claims, key)
     return token, expire
+
+
+def create_refresh_token(
+    subject: UUID | int,
+    token_type: str,
+    expires_delta: timedelta | None = None,
+) -> tuple[str, datetime]:
+    """Refresh JWT 토큰 생성.
+
+    Args:
+        subject: guest_id 또는 user_id
+        token_type: "guest" 또는 "user" (자동으로 _refresh 접미사 추가)
+        expires_delta: 만료 기간 (기본값: 7일)
+
+    Returns:
+        (token, expires_at) 튜플
+    """
+    return create_access_token(
+        subject=subject,
+        token_type=f"{token_type}_refresh",
+        expires_delta=expires_delta
+        or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
 
 
 def decode_token(token: str) -> TokenPayload | None:
@@ -47,16 +78,57 @@ def decode_token(token: str) -> TokenPayload | None:
         TokenPayload 또는 실패 시 None
     """
     try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
-        )
+        key = OctKey.import_key(settings.SECRET_KEY)
+        token_obj = jose_jwt.decode(token, key)
+
+        claims_registry = JWTClaimsRegistry(exp={"essential": True})
+        claims_registry.validate(token_obj.claims)
+
+        claims = token_obj.claims
         return TokenPayload(
-            sub=payload["sub"],
-            type=payload["type"],
-            iat=datetime.fromtimestamp(payload["iat"], tz=UTC),
-            exp=datetime.fromtimestamp(payload["exp"], tz=UTC),
+            sub=claims["sub"],
+            type=claims["type"],
+            iat=datetime.fromtimestamp(claims["iat"], tz=UTC),
+            exp=datetime.fromtimestamp(claims["exp"], tz=UTC),
         )
-    except JWTError:
+    except Exception:
         return None
+
+
+async def find_or_create_user(
+    session: AsyncSession,
+    email: str,
+    provider_id: str,
+    name: str | None = None,
+    picture_url: str | None = None,
+) -> User:
+    """구글 OAuth 사용자 조회 또는 생성."""
+    result = await session.execute(select(User).where(User.provider_id == provider_id))
+    user = result.scalar_one_or_none()
+    if user is not None:
+        return user
+
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is not None:
+        user.provider_id = provider_id
+        if name is not None:
+            user.name = name
+        if picture_url is not None:
+            user.picture_url = picture_url
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+    user = User(
+        email=email,
+        provider="google",
+        provider_id=provider_id,
+        name=name,
+        picture_url=picture_url,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user

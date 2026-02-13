@@ -69,10 +69,12 @@ async def client(test_session_factory) -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture
 async def guest_cookies(client: AsyncClient) -> dict[str, str]:
-    """게스트 세션 생성 후 쿠키 반환."""
+    """게스트 세션 생성 후 클라이언트에 쿠키 설정 + dict 반환."""
     response = await client.post("/auth/guest")
     assert response.status_code == 200
-    return {"guest_id": response.json()["guestId"]}
+    guest_id = response.json()["guestId"]
+    client.cookies.set("guest_id", guest_id)
+    return {"guest_id": guest_id}
 
 
 @pytest.fixture
