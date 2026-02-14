@@ -33,6 +33,24 @@ class PromptSummary(CamelCaseModel):
     created_at: datetime
 
 
+class UpdatePromptRequest(CamelCaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class UpdatePromptResponse(CamelCaseModel):
+    id: int
+    name: str
+    description: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 class CreateVersionRequest(CamelCaseModel):
     system_instruction: str
     user_template: str

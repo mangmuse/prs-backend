@@ -29,6 +29,19 @@ async def list_prompts(
     return await service.list_prompts(identity, session)
 
 
+@router.patch("/{prompt_id}", response_model=schemas.UpdatePromptResponse)
+async def update_prompt(
+    prompt_id: int,
+    data: schemas.UpdatePromptRequest,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> schemas.UpdatePromptResponse:
+    """프롬프트 메타 수정."""
+    prompt = await get_user_prompt(prompt_id, identity, session)
+    updated = await service.update_prompt(prompt, data, session)
+    return schemas.UpdatePromptResponse.model_validate(updated)
+
+
 @router.delete("/{prompt_id}", status_code=204)
 async def delete_prompt(
     prompt_id: int,

@@ -11,6 +11,7 @@ from src.prompts.schemas import (
     CreatePromptResponse,
     CreateVersionRequest,
     PromptSummary,
+    UpdatePromptRequest,
     VersionDetailResponse,
     VersionSummary,
 )
@@ -80,6 +81,22 @@ async def list_prompts(
             )
         )
     return summaries
+
+
+async def update_prompt(
+    prompt: Prompt,
+    data: UpdatePromptRequest,
+    session: AsyncSession,
+) -> Prompt:
+    """프롬프트 메타 수정 (이름/설명)."""
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(prompt, key, value)
+
+    session.add(prompt)
+    await session.commit()
+    await session.refresh(prompt)
+    return prompt
 
 
 async def delete_prompt(

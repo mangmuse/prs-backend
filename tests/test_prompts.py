@@ -209,6 +209,41 @@ async def test_delete_prompt_other_owner_returns_404(
 
 
 @pytest.mark.asyncio
+async def test_update_prompt_name_and_description(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
+    """PATCH /prompts/{id} - 이름과 설명 수정 성공."""
+    create_resp = await client.post(
+        "/prompts",
+        json={"name": "원래 이름", "description": "원래 설명"},
+    )
+    prompt_id = create_resp.json()["id"]
+
+    response = await client.patch(
+        f"/prompts/{prompt_id}",
+        json={"name": "수정된 이름", "description": "수정된 설명"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "수정된 이름"
+    assert data["description"] == "수정된 설명"
+    assert data["id"] == prompt_id
+
+
+@pytest.mark.asyncio
+async def test_update_prompt_not_found_returns_404(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
+    """존재하지 않는 프롬프트 수정 시 404."""
+    response = await client.patch(
+        "/prompts/99999",
+        json={"name": "없는 프롬프트"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None:
     """다른 사용자 프롬프트 접근 시 404."""
     guest1_resp = await client.post("/auth/guest")
