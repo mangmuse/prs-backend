@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from src.auth.models import Guest, User
+from src.common.exceptions import NotFoundError
 from src.common.utils import get_ownership_filter
 from src.datasets.models import Dataset, DatasetRow
 from src.datasets.schemas import (
@@ -12,6 +13,7 @@ from src.datasets.schemas import (
     DatasetRowResponse,
     DatasetSummary,
     PaginationMeta,
+    UpdateRowRequest,
 )
 
 
@@ -115,10 +117,8 @@ async def create_rows(
     session: AsyncSession,
 ) -> int:
     """데이터셋에 row 추가. 생성된 row 개수 반환."""
-    max_index_stmt = (
-        select(func.max(DatasetRow.row_index)).where(
-            col(DatasetRow.dataset_id) == dataset_id
-        )
+    max_index_stmt = select(func.max(DatasetRow.row_index)).where(
+        col(DatasetRow.dataset_id) == dataset_id
     )
     max_index = await session.scalar(max_index_stmt) or 0
 
@@ -137,3 +137,31 @@ async def create_rows(
     await session.commit()
 
     return len(new_rows)
+
+
+async def update_row(
+    dataset_id: int,
+    row_id: int,
+    data: UpdateRowRequest,
+    session: AsyncSession,
+) -> DatasetRow:
+    """데이터셋 행 수정."""
+    result = await session.execute(
+        select(DatasetRow).where(
+            col(DatasetRow.id) == row_id,
+            col(DatasetRow.dataset_id) == dataset_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+
+    if not row:
+        raise NotFoundError(f"DatasetRow {row_id}을(를) 찾을 수 없습니다")
+
+    row.input_data = data.input_data
+    row.expected_output = data.expected_output
+    row.tags = data.tags
+
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row

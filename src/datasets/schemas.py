@@ -73,5 +73,11 @@ class DatasetDetailResponse(CamelCaseModel):
     pagination: PaginationMeta
 
 
+class UpdateRowRequest(CamelCaseModel):
+    input_data: dict[str, Any]
+    expected_output: str
+    tags: list[str] | None = None
+
+
 class CreateRowsResponse(CamelCaseModel):
     created_count: int

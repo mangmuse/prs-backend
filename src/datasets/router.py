@@ -58,3 +58,20 @@ async def create_rows(
     _ = await get_user_dataset(dataset_id, identity, session)
     created_count = await service.create_rows(dataset_id, rows_data, session)
     return schemas.CreateRowsResponse(created_count=created_count)
+
+
+@router.put(
+    "/{dataset_id}/rows/{row_id}",
+    response_model=schemas.DatasetRowResponse,
+)
+async def update_row(
+    dataset_id: int,
+    row_id: int,
+    data: schemas.UpdateRowRequest,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> schemas.DatasetRowResponse:
+    """데이터셋 행 수정."""
+    _ = await get_user_dataset(dataset_id, identity, session)
+    row = await service.update_row(dataset_id, row_id, data, session)
+    return schemas.DatasetRowResponse.model_validate(row)
