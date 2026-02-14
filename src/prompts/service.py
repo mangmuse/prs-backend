@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
@@ -79,6 +80,19 @@ async def list_prompts(
             )
         )
     return summaries
+
+
+async def delete_prompt(
+    prompt: Prompt,
+    session: AsyncSession,
+) -> None:
+    """프롬프트 삭제 (관련 PromptVersion cascade 삭제)."""
+    assert prompt.id is not None
+    _ = await session.execute(
+        delete(PromptVersion).where(col(PromptVersion.prompt_id) == prompt.id)
+    )
+    await session.delete(prompt)
+    await session.commit()
 
 
 async def list_versions(

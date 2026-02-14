@@ -147,6 +147,68 @@ async def test_list_versions(
 
 
 @pytest.mark.asyncio
+async def test_delete_prompt_cascades_versions(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """DELETE /prompts/{id} - 프롬프트 삭제 시 버전도 함께 삭제."""
+    create_resp = await client.post(
+        "/prompts",
+        json={"name": "삭제 대상"},
+    )
+    prompt_id = create_resp.json()["id"]
+
+    await client.post(
+        f"/prompts/{prompt_id}/versions",
+        json={
+            "systemInstruction": "시스템",
+            "userTemplate": "유저",
+        },
+    )
+    await client.post(
+        f"/prompts/{prompt_id}/versions",
+        json={
+            "systemInstruction": "시스템 v2",
+            "userTemplate": "유저 v2",
+        },
+    )
+
+    versions_before = await client.get(f"/prompts/{prompt_id}/versions")
+    assert len(versions_before.json()) == 2
+
+    response = await client.delete(f"/prompts/{prompt_id}")
+    assert response.status_code == 204
+
+    get_resp = await client.get(f"/prompts/{prompt_id}/versions")
+    assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_prompt_not_found_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """존재하지 않는 프롬프트 삭제 시 404."""
+    response = await client.delete("/prompts/99999")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_prompt_other_owner_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    guest_factory,
+    prompt_factory,
+) -> None:
+    """다른 소유자의 프롬프트 삭제 시 404 (SQL 필터 패턴)."""
+    other_guest = await guest_factory()
+    prompt, _ = await prompt_factory(other_guest.id)
+
+    response = await client.delete(f"/prompts/{prompt.id}")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None:
     """다른 사용자 프롬프트 접근 시 404."""
     guest1_resp = await client.post("/auth/guest")

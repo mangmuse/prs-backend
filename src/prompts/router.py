@@ -29,6 +29,17 @@ async def list_prompts(
     return await service.list_prompts(identity, session)
 
 
+@router.delete("/{prompt_id}", status_code=204)
+async def delete_prompt(
+    prompt_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """프롬프트 삭제."""
+    prompt = await get_user_prompt(prompt_id, identity, session)
+    await service.delete_prompt(prompt, session)
+
+
 @router.get("/{prompt_id}/versions", response_model=list[schemas.VersionSummary])
 async def list_versions(
     prompt_id: int,
