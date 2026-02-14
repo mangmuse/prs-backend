@@ -17,6 +17,7 @@ from src.datasets.models import Dataset, DatasetRow
 from src.main import app
 from src.profiles.models import EvaluatorProfile
 from src.prompts.models import OutputSchemaType, Prompt, PromptVersion
+from src.runs.models import Run, RunResult, RunStatus
 
 # 테스트 DB URL (환경변수 또는 기본값: docker-compose의 PostgreSQL)
 TEST_DATABASE_URL = os.getenv(
@@ -194,6 +195,54 @@ def profile_factory(
             await session.commit()
             await session.refresh(profile)
             return profile
+
+    return _create
+
+
+@pytest.fixture
+def run_factory(
+    test_session_factory: async_sessionmaker[AsyncSession],
+) -> Callable[..., Coroutine[Any, Any, Run]]:
+    """Run + RunResult 생성 팩토리."""
+
+    async def _create(
+        prompt_version_id: int,
+        dataset_id: int,
+        profile_id: int,
+        guest_id: str | UUID,
+        status: RunStatus = RunStatus.COMPLETED,
+        results: list[dict[str, Any]] | None = None,
+    ) -> Run:
+        guest_uuid = UUID(guest_id) if isinstance(guest_id, str) else guest_id
+        async with test_session_factory() as session:
+            run = Run(
+                prompt_version_id=prompt_version_id,
+                dataset_id=dataset_id,
+                profile_id=profile_id,
+                profile_snapshot={"semantic_threshold": 0.8, "global_constraints": []},
+                status=status,
+                guest_id=guest_uuid,
+            )
+            session.add(run)
+            await session.commit()
+            await session.refresh(run)
+
+            assert run.id is not None
+            if results:
+                for r in results:
+                    run_result = RunResult(
+                        run_id=run.id,
+                        dataset_row_id=r["dataset_row_id"],
+                        input_snapshot=r.get("input_snapshot", {}),
+                        expected_snapshot=r.get("expected_snapshot", ""),
+                        assembled_prompt=r.get("assembled_prompt", {}),
+                        raw_output=r.get("raw_output", ""),
+                        status=r.get("status", "pass"),
+                    )
+                    session.add(run_result)
+                await session.commit()
+
+            return run
 
     return _create
 

@@ -11,6 +11,7 @@ from src.llm.factory import resolve_api_key
 from src.llm.rate_limiter import extract_provider
 from src.profiles.dependencies import get_user_profile
 from src.prompts.dependencies import get_user_prompt_version
+from src.runs.dependencies import get_user_run
 from src.runs.schemas import (
     CreateRunRequest,
     ReEvaluateRequest,
@@ -24,6 +25,7 @@ from src.runs.schemas import (
 )
 from src.runs.service import (
     compare_runs,
+    delete_run,
     get_related_versions,
     get_run_detail,
     get_runs_summary,
@@ -77,6 +79,17 @@ async def create_run(
         status=run.status.value,
         created_at=run.created_at,
     )
+
+
+@router.delete("/{run_id}", status_code=204)
+async def delete_run_endpoint(
+    run_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Run 삭제."""
+    run = await get_user_run(run_id, identity, session)
+    await delete_run(run, session)
 
 
 @router.get("", response_model=list[RunSummaryResponse])

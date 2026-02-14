@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
@@ -44,6 +45,19 @@ from src.runs.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def delete_run(
+    run: Run,
+    session: AsyncSession,
+) -> None:
+    """Run 삭제 (관련 RunResult cascade 삭제)."""
+    assert run.id is not None
+    _ = await session.execute(
+        sa_delete(RunResult).where(col(RunResult.run_id) == run.id)
+    )
+    await session.delete(run)
+    await session.commit()
 
 
 async def create_run(
