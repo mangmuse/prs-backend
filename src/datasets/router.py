@@ -43,6 +43,19 @@ async def get_dataset_detail(
     return await service.get_dataset_detail(dataset, session, page, limit)
 
 
+@router.patch("/{dataset_id}", response_model=schemas.UpdateDatasetResponse)
+async def update_dataset(
+    dataset_id: int,
+    data: schemas.UpdateDatasetRequest,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> schemas.UpdateDatasetResponse:
+    """데이터셋 메타 수정."""
+    dataset = await get_user_dataset(dataset_id, identity, session)
+    updated = await service.update_dataset(dataset, data, session)
+    return schemas.UpdateDatasetResponse.model_validate(updated)
+
+
 @router.delete("/{dataset_id}", status_code=204)
 async def delete_dataset(
     dataset_id: int,

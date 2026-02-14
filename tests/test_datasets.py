@@ -187,3 +187,40 @@ async def test_delete_dataset_other_owner_returns_403(
 
     response = await client.delete(f"/datasets/{dataset.id}")
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_update_dataset_name_and_description(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """PATCH /datasets/{id} - 이름과 설명 수정 성공."""
+    create_resp = await client.post(
+        "/datasets",
+        json={"name": "원래 이름", "description": "원래 설명"},
+    )
+    dataset_id = create_resp.json()["id"]
+
+    response = await client.patch(
+        f"/datasets/{dataset_id}",
+        json={"name": "수정된 이름", "description": "수정된 설명"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "수정된 이름"
+    assert data["description"] == "수정된 설명"
+    assert data["id"] == dataset_id
+
+
+@pytest.mark.asyncio
+async def test_update_dataset_not_found_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """존재하지 않는 데이터셋 수정 시 404."""
+    response = await client.patch(
+        "/datasets/99999",
+        json={"name": "없는 데이터셋"},
+    )
+    assert response.status_code == 404

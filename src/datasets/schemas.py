@@ -73,6 +73,24 @@ class DatasetDetailResponse(CamelCaseModel):
     pagination: PaginationMeta
 
 
+class UpdateDatasetRequest(CamelCaseModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class UpdateDatasetResponse(CamelCaseModel):
+    id: int
+    name: str
+    description: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 class UpdateRowRequest(CamelCaseModel):
     input_data: dict[str, Any]
     expected_output: str

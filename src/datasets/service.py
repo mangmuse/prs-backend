@@ -13,6 +13,7 @@ from src.datasets.schemas import (
     DatasetRowResponse,
     DatasetSummary,
     PaginationMeta,
+    UpdateDatasetRequest,
     UpdateRowRequest,
 )
 
@@ -109,6 +110,22 @@ async def get_dataset_detail(
             total_pages=total_pages,
         ),
     )
+
+
+async def update_dataset(
+    dataset: Dataset,
+    data: UpdateDatasetRequest,
+    session: AsyncSession,
+) -> Dataset:
+    """데이터셋 메타 수정 (이름/설명)."""
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(dataset, key, value)
+
+    session.add(dataset)
+    await session.commit()
+    await session.refresh(dataset)
+    return dataset
 
 
 async def delete_dataset(
