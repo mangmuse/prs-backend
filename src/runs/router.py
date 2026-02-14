@@ -69,7 +69,7 @@ async def create_run(
     if row_count == 0:
         raise HTTPException(status_code=400, detail="데이터셋이 비어 있습니다")
 
-    run = await create_run_service(data, session)
+    run = await create_run_service(data, identity, session)
 
     assert run.id is not None
     background_tasks.add_task(process_run_task, run.id, data.api_key)

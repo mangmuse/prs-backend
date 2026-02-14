@@ -62,6 +62,7 @@ async def delete_run(
 
 async def create_run(
     data: CreateRunRequest,
+    identity: Guest | User,
     session: AsyncSession,
 ) -> Run:
     """Run 생성 (DB 저장)."""
@@ -85,6 +86,8 @@ async def create_run(
         profile_id=data.profile_id,
         profile_snapshot=profile_snapshot,
         status=RunStatus.RUNNING,
+        guest_id=identity.id if isinstance(identity, Guest) else None,
+        user_id=identity.id if isinstance(identity, User) else None,
     )
     return await repo.create(run)
 
