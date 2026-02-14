@@ -80,3 +80,58 @@ async def test_update_dataset_row_other_owner_returns_403(
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_dataset_row_returns_204(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """DELETE /datasets/{id}/rows/{row_id} - 행 삭제 성공."""
+    create_ds = await client.post("/datasets", json={"name": "삭제 테스트"})
+    dataset_id = create_ds.json()["id"]
+
+    await client.post(
+        f"/datasets/{dataset_id}/rows",
+        json=[{"inputData": {"claim": "삭제할 행"}, "expectedOutput": "TRUE"}],
+    )
+
+    detail = await client.get(f"/datasets/{dataset_id}")
+    row_id = detail.json()["rows"][0]["id"]
+
+    response = await client.delete(f"/datasets/{dataset_id}/rows/{row_id}")
+    assert response.status_code == 204
+
+    detail_after = await client.get(f"/datasets/{dataset_id}")
+    assert len(detail_after.json()["rows"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_dataset_row_not_found_returns_404(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+) -> None:
+    """존재하지 않는 행 삭제 시 404."""
+    create_ds = await client.post("/datasets", json={"name": "404 삭제"})
+    dataset_id = create_ds.json()["id"]
+
+    response = await client.delete(f"/datasets/{dataset_id}/rows/99999")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_dataset_row_other_owner_returns_403(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    guest_factory,
+    dataset_factory,
+) -> None:
+    """다른 소유자의 행 삭제 시 403."""
+    other_guest = await guest_factory()
+    dataset = await dataset_factory(
+        other_guest.id,
+        rows=[{"input": {"claim": "남의 것"}, "expected": "TRUE"}],
+    )
+
+    response = await client.delete(f"/datasets/{dataset.id}/rows/1")
+    assert response.status_code == 403

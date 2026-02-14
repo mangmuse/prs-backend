@@ -165,3 +165,24 @@ async def update_row(
     await session.commit()
     await session.refresh(row)
     return row
+
+
+async def delete_row(
+    dataset_id: int,
+    row_id: int,
+    session: AsyncSession,
+) -> None:
+    """데이터셋 행 삭제."""
+    result = await session.execute(
+        select(DatasetRow).where(
+            col(DatasetRow.id) == row_id,
+            col(DatasetRow.dataset_id) == dataset_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+
+    if not row:
+        raise NotFoundError(f"DatasetRow {row_id}을(를) 찾을 수 없습니다")
+
+    await session.delete(row)
+    await session.commit()

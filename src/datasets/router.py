@@ -75,3 +75,15 @@ async def update_row(
     _ = await get_user_dataset(dataset_id, identity, session)
     row = await service.update_row(dataset_id, row_id, data, session)
     return schemas.DatasetRowResponse.model_validate(row)
+
+
+@router.delete("/{dataset_id}/rows/{row_id}", status_code=204)
+async def delete_row(
+    dataset_id: int,
+    row_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """데이터셋 행 삭제."""
+    _ = await get_user_dataset(dataset_id, identity, session)
+    await service.delete_row(dataset_id, row_id, session)
