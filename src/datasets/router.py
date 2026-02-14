@@ -43,6 +43,17 @@ async def get_dataset_detail(
     return await service.get_dataset_detail(dataset, session, page, limit)
 
 
+@router.delete("/{dataset_id}", status_code=204)
+async def delete_dataset(
+    dataset_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """데이터셋 삭제."""
+    dataset = await get_user_dataset(dataset_id, identity, session)
+    await service.delete_dataset(dataset, session)
+
+
 @router.post(
     "/{dataset_id}/rows",
     response_model=schemas.CreateRowsResponse,

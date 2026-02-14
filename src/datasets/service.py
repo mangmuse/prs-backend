@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
@@ -109,6 +109,19 @@ async def get_dataset_detail(
             total_pages=total_pages,
         ),
     )
+
+
+async def delete_dataset(
+    dataset: Dataset,
+    session: AsyncSession,
+) -> None:
+    """데이터셋 삭제 (관련 DatasetRow cascade 삭제)."""
+    assert dataset.id is not None
+    _ = await session.execute(
+        delete(DatasetRow).where(col(DatasetRow.dataset_id) == dataset.id)
+    )
+    await session.delete(dataset)
+    await session.commit()
 
 
 async def create_rows(
