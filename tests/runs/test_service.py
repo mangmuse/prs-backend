@@ -111,15 +111,21 @@ class TestProcessRun:
         async with test_session_factory() as session:
             from sqlmodel import select
 
-            run = (await session.execute(
-                select(Run).where(Run.id == run_id)
-            )).scalar_one()
+            run = (
+                await session.execute(select(Run).where(Run.id == run_id))
+            ).scalar_one()
 
             assert run.status == RunStatus.COMPLETED
 
-            results = (await session.execute(
-                select(RunResult).where(RunResult.run_id == run_id)
-            )).scalars().all()
+            results = (
+                (
+                    await session.execute(
+                        select(RunResult).where(RunResult.run_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             assert len(results) == 1
             assert results[0].raw_output == "TRUE"
@@ -182,9 +188,15 @@ class TestProcessRun:
         async with test_session_factory() as session:
             from sqlmodel import select
 
-            results = (await session.execute(
-                select(RunResult).where(RunResult.run_id == run_id)
-            )).scalars().all()
+            results = (
+                (
+                    await session.execute(
+                        select(RunResult).where(RunResult.run_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             assert len(results) == 1
             assert results[0].status == ResultStatus.SEMANTIC
@@ -246,9 +258,15 @@ class TestProcessRun:
         async with test_session_factory() as session:
             from sqlmodel import select
 
-            results = (await session.execute(
-                select(RunResult).where(RunResult.run_id == run_id)
-            )).scalars().all()
+            results = (
+                (
+                    await session.execute(
+                        select(RunResult).where(RunResult.run_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             assert len(results) == 1
             assert results[0].status == ResultStatus.FORMAT
@@ -267,7 +285,9 @@ class TestProcessRun:
         guest = await guest_factory()
         guest_id = guest.id
 
-        _, version = await prompt_factory(guest_id, output_schema=OutputSchemaType.FREEFORM)
+        _, version = await prompt_factory(
+            guest_id, output_schema=OutputSchemaType.FREEFORM
+        )
         dataset = await dataset_factory(
             guest_id,
             rows=[
@@ -310,14 +330,20 @@ class TestProcessRun:
         async with test_session_factory() as session:
             from sqlmodel import select
 
-            run = (await session.execute(
-                select(Run).where(Run.id == run_id)
-            )).scalar_one()
+            run = (
+                await session.execute(select(Run).where(Run.id == run_id))
+            ).scalar_one()
             assert run.status == RunStatus.COMPLETED
 
-            results = (await session.execute(
-                select(RunResult).where(RunResult.run_id == run_id)
-            )).scalars().all()
+            results = (
+                (
+                    await session.execute(
+                        select(RunResult).where(RunResult.run_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             assert len(results) == 3
             assert all(r.status == ResultStatus.PASS for r in results)
@@ -374,8 +400,8 @@ class TestProcessRun:
         async with test_session_factory() as session:
             from sqlmodel import select
 
-            run = (await session.execute(
-                select(Run).where(Run.id == run_id)
-            )).scalar_one()
+            run = (
+                await session.execute(select(Run).where(Run.id == run_id))
+            ).scalar_one()
 
             assert run.status == RunStatus.FAILED

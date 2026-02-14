@@ -5,7 +5,9 @@ from typing import Annotated, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
-type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
+type JsonValue = (
+    str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
+)
 
 
 class ConstraintType(StrEnum):

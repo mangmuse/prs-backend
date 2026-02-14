@@ -15,7 +15,7 @@ async def test_logout_clears_cookies(client: AsyncClient) -> None:
     cookie_str = " ".join(set_cookie_headers)
     assert "refresh_token" in cookie_str
     assert "guest_id" in cookie_str
-    assert 'Max-Age=0' in cookie_str or 'max-age=0' in cookie_str
+    assert "Max-Age=0" in cookie_str or "max-age=0" in cookie_str
 
 
 @pytest.mark.asyncio

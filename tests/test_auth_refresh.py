@@ -77,7 +77,9 @@ async def test_refresh_with_access_token(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_refresh_with_expired_token(client: AsyncClient) -> None:
     """만료된 토큰 → 401"""
-    refresh_token, _ = create_refresh_token(1, "user", expires_delta=timedelta(seconds=-1))
+    refresh_token, _ = create_refresh_token(
+        1, "user", expires_delta=timedelta(seconds=-1)
+    )
     client.cookies.set("refresh_token", refresh_token)
 
     response = await client.post("/auth/refresh")
