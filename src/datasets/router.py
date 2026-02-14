@@ -55,6 +55,6 @@ async def create_rows(
     session: AsyncSession = Depends(get_session),
 ) -> schemas.CreateRowsResponse:
     """데이터셋 행 일괄 생성."""
-    await get_user_dataset(dataset_id, identity, session)
+    _ = await get_user_dataset(dataset_id, identity, session)
     created_count = await service.create_rows(dataset_id, rows_data, session)
     return schemas.CreateRowsResponse(created_count=created_count)

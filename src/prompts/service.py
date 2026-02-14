@@ -103,12 +103,12 @@ async def create_version(
     session: AsyncSession,
 ) -> VersionDetailResponse:
     """새 버전 생성."""
-    max_ver_stmt = (
-        select(func.max(PromptVersion.version_number))
-        .where(col(PromptVersion.prompt_id) == prompt.id)
+    max_ver_stmt = select(func.max(PromptVersion.version_number)).where(
+        col(PromptVersion.prompt_id) == prompt.id
     )
     max_ver = await session.scalar(max_ver_stmt) or 0
 
+    assert prompt.id is not None
     version = PromptVersion(
         prompt_id=prompt.id,
         version_number=max_ver + 1,
@@ -152,7 +152,7 @@ async def get_version(
     version = result.scalar_one_or_none()
 
     if not version:
-        raise HTTPException(status_code=404, detail="Version not found")
+        raise HTTPException(status_code=404, detail="버전을 찾을 수 없습니다")
 
     assert version.id is not None
     return VersionDetailResponse(

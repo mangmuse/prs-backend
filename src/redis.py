@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import Request
+
 from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,8 @@ async def retrieve_temp_code(redis: Redis, code: str) -> dict[str, str | bool] |
     if value is None:
         return None
     try:
-        return json.loads(value)
+        parsed: dict[str, str | bool] = json.loads(value)
+        return parsed
     except json.JSONDecodeError:
         logger.warning("Redis 임시코드 JSON 파싱 실패: key=%s", key)
         return None

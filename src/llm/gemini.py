@@ -1,3 +1,5 @@
+from typing import override
+
 from google import genai
 from google.genai import types
 
@@ -29,6 +31,7 @@ class GeminiClient(BaseLLMClient):
         )
         self.client: genai.Client = genai.Client(api_key=resolved_key)
 
+    @override
     async def generate(
         self,
         system_instruction: str,
@@ -72,6 +75,7 @@ class GeminiClient(BaseLLMClient):
             )
         return models
 
+    @override
     async def list_models(self) -> list[ModelInfo]:
         """모델 목록 조회 (async wrapper)."""
         return self.list_models_sync()

@@ -1,5 +1,7 @@
-from typing import Any
+from typing import Any, NamedTuple
 
+from sqlalchemy import Select
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
@@ -8,6 +10,41 @@ from src.datasets.models import Dataset
 from src.profiles.models import EvaluatorProfile
 from src.prompts.models import Prompt, PromptVersion
 from src.runs.models import ResultStatus, Run, RunResult, RunStatus
+
+
+class RunSummaryRow(NamedTuple):
+    run: Run
+    prompt_id: int
+    version_number: int
+    prompt_name: str
+    dataset_name: str
+    profile_name: str
+    pass_count: int
+    total_count: int
+    avg_semantic: float | None
+    format_pass_count: int
+    semantic_pass_count: int
+    constraint_pass_count: int
+
+
+class RunDetailRow(NamedTuple):
+    run: Run
+    prompt_id: int
+    prompt_name: str
+    version_number: int
+    dataset_name: str
+
+
+class RunWithPromptIdRow(NamedTuple):
+    run: Run
+    prompt_id: int
+
+
+class RelatedRunRow(NamedTuple):
+    run: Run
+    version_number: int
+    pass_count: int
+    total_count: int
 
 
 class RunRepository:
@@ -69,7 +106,7 @@ class RunRepository:
                 await self.session.execute(
                     select(RunResult)
                     .where(RunResult.run_id == run_id)
-                    .order_by(RunResult.id)
+                    .order_by(col(RunResult.id))
                 )
             )
             .scalars()
@@ -80,7 +117,7 @@ class RunRepository:
         self,
         identity: Guest | User,
         grouped: bool = True,
-    ) -> list[Any]:
+    ) -> list[RunSummaryRow]:
         """Run 목록 조회 (집계 포함).
 
         Returns:
@@ -144,11 +181,11 @@ class RunRepository:
             .scalar_subquery()
         )
 
-        stmt = (
-            select(
+        stmt: Select[Any] = (
+            sa_select(
                 Run,
                 col(Prompt.id).label("prompt_id"),
-                PromptVersion.version_number,
+                col(PromptVersion.version_number),
                 col(Prompt.name).label("prompt_name"),
                 col(Dataset.name).label("dataset_name"),
                 col(EvaluatorProfile.name).label("profile_name"),
@@ -188,21 +225,16 @@ class RunRepository:
         stmt = stmt.order_by(col(Run.created_at).desc())
 
         result = await self.session.execute(stmt)
-        return list(result.all())
+        return [RunSummaryRow(*row) for row in result.all()]
 
     async def get_run_detail(
         self,
         run_id: int,
         identity: Guest | User,
-    ) -> Any | None:
-        """Run 상세 조회 (소유권 검증 포함).
-
-        Returns:
-            Row 또는 None. Row는 다음 속성을 가짐:
-            - Run, prompt_id, prompt_name, version_number, dataset_name
-        """
-        stmt = (
-            select(
+    ) -> RunDetailRow | None:
+        """Run 상세 조회 (소유권 검증 포함)."""
+        stmt: Select[Any] = (
+            sa_select(
                 Run,
                 col(Prompt.id).label("prompt_id"),
                 col(Prompt.name).label("prompt_name"),
@@ -221,7 +253,8 @@ class RunRepository:
             stmt = stmt.where(col(Prompt.user_id) == identity.id)
 
         result = await self.session.execute(stmt)
-        return result.one_or_none()
+        row = result.one_or_none()
+        return RunDetailRow(*row) if row else None
 
     async def get_profile_by_id(self, profile_id: int) -> EvaluatorProfile | None:
         """EvaluatorProfile 단건 조회."""
@@ -235,15 +268,10 @@ class RunRepository:
         self,
         run_id: int,
         identity: Guest | User,
-    ) -> Any | None:
-        """Run + prompt_id 조회 (소유권 검증 포함).
-
-        Returns:
-            Row 또는 None. Row는 다음 속성을 가짐:
-            - Run, prompt_id
-        """
-        stmt = (
-            select(
+    ) -> RunWithPromptIdRow | None:
+        """Run + prompt_id 조회 (소유권 검증 포함)."""
+        stmt: Select[Any] = (
+            sa_select(
                 Run,
                 col(PromptVersion.prompt_id).label("prompt_id"),
             )
@@ -258,20 +286,16 @@ class RunRepository:
             stmt = stmt.where(col(Prompt.user_id) == identity.id)
 
         result = await self.session.execute(stmt)
-        return result.one_or_none()
+        row = result.one_or_none()
+        return RunWithPromptIdRow(*row) if row else None
 
     async def get_related_runs(
         self,
         prompt_id: int,
         dataset_id: int,
         profile_id: int,
-    ) -> list[Any]:
-        """같은 조합(prompt_id + dataset_id + profile_id)의 Run 목록 조회.
-
-        Returns:
-            Row 리스트. 각 Row는 다음 속성을 가짐:
-            - Run, version_number, pass_count, total_count
-        """
+    ) -> list[RelatedRunRow]:
+        """같은 조합(prompt_id + dataset_id + profile_id)의 Run 목록 조회."""
         pass_count_subq = (
             select(func.count())
             .where(
@@ -289,8 +313,8 @@ class RunRepository:
             .scalar_subquery()
         )
 
-        stmt = (
-            select(
+        stmt: Select[Any] = (
+            sa_select(
                 Run,
                 col(PromptVersion.version_number).label("version_number"),
                 pass_count_subq.label("pass_count"),
@@ -306,7 +330,7 @@ class RunRepository:
         )
 
         result = await self.session.execute(stmt)
-        return list(result.all())
+        return [RelatedRunRow(*row) for row in result.all()]
 
     async def get_all_versions_by_prompt_id(
         self,

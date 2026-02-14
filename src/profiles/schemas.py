@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 from src.common.schemas import CamelCaseModel
@@ -11,7 +11,7 @@ class CreateProfileRequest(CamelCaseModel):
     name: str
     description: str | None = None
     semantic_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
-    global_constraints: list[LogicConstraint] | None = None
+    global_constraints: list[LogicConstraint] = Field(default_factory=list)
 
 
 class UpdateProfileRequest(CamelCaseModel):
@@ -26,9 +26,17 @@ class ProfileResponse(CamelCaseModel):
     name: str
     description: str | None
     semantic_threshold: float
-    global_constraints: list[LogicConstraint] | None
+    global_constraints: list[LogicConstraint]
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("global_constraints", mode="before")
+    @classmethod
+    def ensure_constraints_list(
+        cls,
+        v: list[LogicConstraint] | None,
+    ) -> list[LogicConstraint]:
+        return v if v is not None else []
 
     model_config = ConfigDict(
         from_attributes=True,

@@ -25,7 +25,7 @@ async def get_user_prompt(
     prompt = result.scalar_one_or_none()
 
     if not prompt:
-        raise HTTPException(status_code=404, detail="Prompt not found")
+        raise HTTPException(status_code=404, detail="프롬프트를 찾을 수 없습니다")
     return prompt
 
 

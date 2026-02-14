@@ -1,3 +1,5 @@
+from typing import override
+
 from anthropic import AsyncAnthropic
 from anthropic.types import TextBlock
 
@@ -9,7 +11,9 @@ from src.llm.schemas import ModelInfo
 class AnthropicClient(BaseLLMClient):
     """Anthropic Claude LLM 클라이언트."""
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str | None = None):
+    def __init__(
+        self, model: str = "claude-sonnet-4-20250514", api_key: str | None = None
+    ):
         settings = get_settings()
         resolved_key = api_key or settings.ANTHROPIC_API_KEY
         super().__init__(
@@ -19,6 +23,7 @@ class AnthropicClient(BaseLLMClient):
         )
         self.client = AsyncAnthropic(api_key=resolved_key)
 
+    @override
     async def generate(
         self,
         system_instruction: str,
@@ -42,6 +47,7 @@ class AnthropicClient(BaseLLMClient):
         text = block.text if isinstance(block, TextBlock) else None
         return self._ensure_response(text, "Anthropic")
 
+    @override
     async def list_models(self) -> list[ModelInfo]:
         """모델 목록 조회."""
         response = await self.client.models.list()

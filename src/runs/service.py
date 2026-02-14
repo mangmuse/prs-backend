@@ -13,7 +13,7 @@ from src.auth.models import Guest, User
 
 if TYPE_CHECKING:
     from src.llm.base import LLMClient
-from src.common.types import JsonValue
+from src.common.types import JsonValue, LogicConstraint
 from src.database import async_session
 from src.datasets.models import DatasetRow
 from src.llm.factory import get_llm_client
@@ -112,7 +112,7 @@ async def _process_single_row(
     version: PromptVersion,
     llm: LLMClient,
     threshold: float,
-    constraints: list,
+    constraints: list[LogicConstraint],
 ) -> RunResult:
     """단일 row 처리 (LLM 호출 + 평가). 예외 발생 시 상위에서 처리."""
     assert row.id is not None
@@ -197,6 +197,7 @@ async def execute_run(run_id: int, api_key: str | None = None) -> None:
 
         try:
             assert run.id is not None
+            current_run_id = run.id
 
             version = (
                 await session.execute(
@@ -238,7 +239,7 @@ async def execute_run(run_id: int, api_key: str | None = None) -> None:
                 async with sem:
                     return await _process_single_row(
                         row=row,
-                        run_id=run.id,
+                        run_id=current_run_id,
                         version=version,
                         llm=llm,
                         threshold=threshold,
@@ -261,7 +262,7 @@ async def execute_run(run_id: int, api_key: str | None = None) -> None:
                     )
                     fail_count += 1
                     continue
-                await repo.create_result(result)
+                _ = await repo.create_result(result)
                 success_count += 1
 
             logger.info(
@@ -309,34 +310,45 @@ async def get_runs_summary(
     repo = RunRepository(session)
     rows = await repo.get_runs_summary(identity, grouped)
 
-    return [
-        RunSummaryResponse(
-            id=row.Run.id,
-            prompt_id=row.prompt_id,
-            prompt_version_id=row.Run.prompt_version_id,
-            prompt_name=row.prompt_name,
-            version_number=row.version_number,
-            dataset_id=row.Run.dataset_id,
-            dataset_name=row.dataset_name,
-            profile_id=row.Run.profile_id,
-            profile_name=row.profile_name,
-            status=row.Run.status.value,
-            pass_rate=((row.pass_count / row.total_count) if row.total_count else None),
-            avg_semantic=row.avg_semantic,
-            format_pass_rate=(
-                (row.format_pass_count / row.total_count) if row.total_count else None
-            ),
-            semantic_pass_rate=(
-                (row.semantic_pass_count / row.total_count) if row.total_count else None
-            ),
-            constraint_pass_rate=(
-                (row.constraint_pass_count / row.total_count) if row.total_count else None
-            ),
-            total_rows=row.total_count or 0,
-            created_at=row.Run.created_at,
+    result: list[RunSummaryResponse] = []
+    for row in rows:
+        assert row.run.id is not None
+        result.append(
+            RunSummaryResponse(
+                id=row.run.id,
+                prompt_id=row.prompt_id,
+                prompt_version_id=row.run.prompt_version_id,
+                prompt_name=row.prompt_name,
+                version_number=row.version_number,
+                dataset_id=row.run.dataset_id,
+                dataset_name=row.dataset_name,
+                profile_id=row.run.profile_id,
+                profile_name=row.profile_name,
+                status=row.run.status.value,
+                pass_rate=(
+                    (row.pass_count / row.total_count) if row.total_count else None
+                ),
+                avg_semantic=row.avg_semantic,
+                format_pass_rate=(
+                    (row.format_pass_count / row.total_count)
+                    if row.total_count
+                    else None
+                ),
+                semantic_pass_rate=(
+                    (row.semantic_pass_count / row.total_count)
+                    if row.total_count
+                    else None
+                ),
+                constraint_pass_rate=(
+                    (row.constraint_pass_count / row.total_count)
+                    if row.total_count
+                    else None
+                ),
+                total_rows=row.total_count or 0,
+                created_at=row.run.created_at,
+            )
         )
-        for row in rows
-    ]
+    return result
 
 
 async def get_run_detail(
@@ -351,7 +363,7 @@ async def get_run_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
-    run = row.Run
+    run = row.run
     prompt_id = row.prompt_id
     prompt_name = row.prompt_name
     version_number = row.version_number
@@ -439,25 +451,29 @@ async def get_related_versions(
     if not run_row:
         raise HTTPException(status_code=404, detail="Run을 찾을 수 없습니다")
 
-    current_run = run_row.Run
+    current_run = run_row.run
     prompt_id = run_row.prompt_id
     dataset_id = current_run.dataset_id
     profile_id = current_run.profile_id
 
     related_rows = await repo.get_related_runs(prompt_id, dataset_id, profile_id)
 
-    executed_runs = [
-        RelatedRunResponse(
-            id=row.Run.id,
-            version_number=row.version_number,
-            status=row.Run.status.value,
-            pass_rate=(row.pass_count / row.total_count) if row.total_count else None,
-            created_at=row.Run.created_at,
+    executed_runs: list[RelatedRunResponse] = []
+    for row in related_rows:
+        assert row.run.id is not None
+        executed_runs.append(
+            RelatedRunResponse(
+                id=row.run.id,
+                version_number=row.version_number,
+                status=row.run.status.value,
+                pass_rate=(
+                    (row.pass_count / row.total_count) if row.total_count else None
+                ),
+                created_at=row.run.created_at,
+            )
         )
-        for row in related_rows
-    ]
 
-    executed_version_ids = {row.Run.prompt_version_id for row in related_rows}
+    executed_version_ids = {row.run.prompt_version_id for row in related_rows}
 
     all_versions = await repo.get_all_versions_by_prompt_id(prompt_id)
 
@@ -467,7 +483,7 @@ async def get_related_versions(
             version_number=v.version_number,
         )
         for v in all_versions
-        if v.id not in executed_version_ids
+        if v.id is not None and v.id not in executed_version_ids
     ]
 
     return RelatedVersionsResponse(
@@ -543,9 +559,7 @@ async def update_run_profile_snapshot(
 
     run.profile_snapshot = {
         "semantic_threshold": data.semantic_threshold,
-        "global_constraints": [
-            c.model_dump() for c in data.global_constraints
-        ],
+        "global_constraints": [c.model_dump() for c in data.global_constraints],
     }
     await session.commit()
 
@@ -586,7 +600,9 @@ async def re_evaluate_run(
             ReEvaluatedRow(
                 id=r.id,
                 status=new_status,
-                constraint_results=constraint_result.model_dump() if constraint_result else None,
+                constraint_results=constraint_result.model_dump()
+                if constraint_result
+                else None,
             )
         )
 

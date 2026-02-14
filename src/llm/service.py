@@ -32,7 +32,9 @@ async def list_models() -> ModelsResponse:
             models = await anthropic_client.list_models()
             all_models.extend(models)
         except Exception as e:
-            logger.warning("Anthropic 모델 조회 실패: %s", sanitize_error_message(str(e)))
+            logger.warning(
+                "Anthropic 모델 조회 실패: %s", sanitize_error_message(str(e))
+            )
 
     if settings.GOOGLE_API_KEY:
         try:
@@ -54,9 +56,7 @@ async def verify_api_key(provider: str, api_key: str) -> VerifyKeyResponse:
 
     try:
         client = PROVIDER_CLIENTS[provider](model="dummy", api_key=api_key)
-        await client.list_models()
+        _ = await client.list_models()
         return VerifyKeyResponse(valid=True)
     except Exception:
-        return VerifyKeyResponse(
-            valid=False, error="API Key가 유효하지 않습니다"
-        )
+        return VerifyKeyResponse(valid=False, error="API Key가 유효하지 않습니다")

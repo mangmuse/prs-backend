@@ -1,9 +1,19 @@
-from sqlmodel import SQLModel, col
+from typing import Any, Protocol
+
+from sqlalchemy import ColumnElement
+from sqlmodel import col
 
 from src.auth.models import Guest, User
 
 
-def get_ownership_filter[T: SQLModel](identity: Guest | User, model: type[T]):
+class OwnedModel(Protocol):
+    guest_id: Any
+    user_id: Any
+
+
+def get_ownership_filter(
+    identity: Guest | User, model: type[OwnedModel]
+) -> ColumnElement[bool]:
     """소유권 필터 조건 생성."""
     if isinstance(identity, Guest):
         return col(model.guest_id) == identity.id

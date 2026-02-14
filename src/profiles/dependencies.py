@@ -25,5 +25,5 @@ async def get_user_profile(
     profile = result.scalar_one_or_none()
 
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다")
     return profile

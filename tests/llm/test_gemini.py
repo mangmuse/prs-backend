@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from src.llm.base import BaseLLMClient
 from src.llm.gemini import GeminiClient
@@ -86,7 +87,10 @@ class TestGeminiClientIsTextModel:
 
     def test_tts_filtered(self):
         actions = ["generateContent"]
-        assert GeminiClient._is_text_model("gemini-2.5-flash-preview-tts", actions) is False
+        assert (
+            GeminiClient._is_text_model("gemini-2.5-flash-preview-tts", actions)
+            is False
+        )
 
 
 class TestGeminiClientListModels:

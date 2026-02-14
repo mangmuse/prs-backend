@@ -19,7 +19,7 @@ _PROVIDER_KEY_MAP = {
 }
 
 
-def _resolve_api_key(provider: str, api_key: str | None) -> str:
+def resolve_api_key(provider: str, api_key: str | None) -> str:
     """provider별 API Key 해석: 사용자 키 > DEBUG 환경 키 > 에러."""
     if api_key:
         return api_key
@@ -29,11 +29,9 @@ def _resolve_api_key(provider: str, api_key: str | None) -> str:
         key_name = _PROVIDER_KEY_MAP.get(provider, "")
         env_key = getattr(settings, key_name, None) if key_name else None
         if env_key:
-            return env_key
+            return str(env_key)
 
-    raise ValueError(
-        f"{provider} API Key가 필요합니다. Settings에서 입력해주세요."
-    )
+    raise ValueError(f"{provider} API Key가 필요합니다. Settings에서 입력해주세요.")
 
 
 def get_llm_client(model: str, api_key: str | None = None) -> LLMClient:
@@ -48,17 +46,13 @@ def get_llm_client(model: str, api_key: str | None = None) -> LLMClient:
         ValueError: provider가 없거나 지원하지 않는 경우
     """
     if "/" not in model:
-        raise ValueError(
-            f"모델명은 'provider/model-name' 형식이어야 합니다: {model}"
-        )
+        raise ValueError(f"모델명은 'provider/model-name' 형식이어야 합니다: {model}")
 
     provider, model_name = model.split("/", 1)
 
     if provider not in PROVIDER_CLIENTS:
         supported = ", ".join(PROVIDER_CLIENTS.keys())
-        raise ValueError(
-            f"지원하지 않는 provider: {provider}. 지원 목록: {supported}"
-        )
+        raise ValueError(f"지원하지 않는 provider: {provider}. 지원 목록: {supported}")
 
-    resolved_key = _resolve_api_key(provider, api_key)
+    resolved_key = resolve_api_key(provider, api_key)
     return PROVIDER_CLIENTS[provider](model=model_name, api_key=resolved_key)

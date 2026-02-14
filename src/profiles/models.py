@@ -18,8 +18,8 @@ class EvaluatorProfile(SQLModel, table=True):
     name: str = Field(index=True)
     description: str | None = None
     semantic_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
-    global_constraints: list[LogicConstraint] | None = Field(
-        default=None, sa_column=Column(JSONB)
+    global_constraints: list[LogicConstraint] = Field(
+        default_factory=list, sa_column=Column(JSONB)
     )
     user_id: int | None = Field(default=None, foreign_key="users.id", index=True)
     guest_id: UUID | None = Field(default=None, foreign_key="guests.id", index=True)

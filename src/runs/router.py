@@ -1,10 +1,14 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import func, select
 
 from src.auth.dependencies import get_current_identity
 from src.auth.models import Guest, User
 from src.database import get_session
 from src.datasets.dependencies import get_user_dataset
+from src.datasets.models import DatasetRow
+from src.llm.factory import resolve_api_key
+from src.llm.rate_limiter import extract_provider
 from src.profiles.dependencies import get_user_profile
 from src.prompts.dependencies import get_user_prompt_version
 from src.runs.schemas import (
@@ -42,9 +46,26 @@ async def create_run(
     session: AsyncSession = Depends(get_session),
 ) -> RunCreateResponse:
     """Run 생성 및 백그라운드 실행."""
-    await get_user_prompt_version(data.prompt_version_id, identity, session)
-    await get_user_dataset(data.dataset_id, identity, session)
-    await get_user_profile(data.profile_id, identity, session)
+    version = await get_user_prompt_version(data.prompt_version_id, identity, session)
+    _ = await get_user_dataset(data.dataset_id, identity, session)
+    _ = await get_user_profile(data.profile_id, identity, session)
+
+    provider = extract_provider(version.model)
+    try:
+        _ = resolve_api_key(provider, data.api_key)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{provider} API Key가 필요합니다. Settings에서 입력해주세요.",
+        )
+
+    row_count = (
+        await session.execute(
+            select(func.count()).where(DatasetRow.dataset_id == data.dataset_id)
+        )
+    ).scalar_one()
+    if row_count == 0:
+        raise HTTPException(status_code=400, detail="데이터셋이 비어 있습니다")
 
     run = await create_run_service(data, session)
 

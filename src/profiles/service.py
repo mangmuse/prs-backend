@@ -18,16 +18,11 @@ async def create_profile(
     session: AsyncSession,
 ) -> EvaluatorProfile:
     """프로필 생성."""
-    constraints_as_dicts = (
-        [c.model_dump() for c in data.global_constraints]
-        if data.global_constraints
-        else None
-    )
     profile = EvaluatorProfile(
         name=data.name,
         description=data.description,
         semantic_threshold=data.semantic_threshold,
-        global_constraints=constraints_as_dicts,
+        global_constraints=[c.model_dump() for c in data.global_constraints],  # pyright: ignore[reportArgumentType]  # JSONB는 dict 필요, LogicConstraint 타입과 불가피한 불일치
     )
     if isinstance(identity, Guest):
         profile.guest_id = identity.id
@@ -54,17 +49,20 @@ async def list_profiles(
     )
     profiles = (await session.execute(stmt)).scalars().all()
 
-    return [
-        ProfileSummary(
-            id=p.id,
-            name=p.name,
-            description=p.description,
-            semantic_threshold=p.semantic_threshold,
-            constraint_count=len(p.global_constraints) if p.global_constraints else 0,
-            created_at=p.created_at,
+    result: list[ProfileSummary] = []
+    for p in profiles:
+        assert p.id is not None
+        result.append(
+            ProfileSummary(
+                id=p.id,
+                name=p.name,
+                description=p.description,
+                semantic_threshold=p.semantic_threshold,
+                constraint_count=len(p.global_constraints or []),
+                created_at=p.created_at,
+            )
         )
-        for p in profiles
-    ]
+    return result
 
 
 async def update_profile(
@@ -75,9 +73,9 @@ async def update_profile(
     """프로필 수정."""
     update_data = data.model_dump(exclude_unset=True)
 
-    if "global_constraints" in update_data and update_data["global_constraints"]:
+    if "global_constraints" in update_data and data.global_constraints is not None:
         update_data["global_constraints"] = [
-            c.model_dump() for c in data.global_constraints  # type: ignore[union-attr]
+            c.model_dump() for c in data.global_constraints
         ]
 
     for key, value in update_data.items():

@@ -39,6 +39,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.14",
     "fakeredis>=2.26.0",
+    "scipy-stubs>=1.17.0.2",
 ]
 
 [tool.ruff]
@@ -49,6 +50,9 @@ exclude = [".git", ".venv", "alembic/versions"]
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM"]
 ignore = ["E501", "B008", "B904"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG001", "ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -77,7 +81,19 @@ pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "recommended"
+enableTypeIgnoreComments = false
 # SQLModel __tablename__ 재정의 허용
 reportIncompatibleVariableOverride = false
 # FastAPI Depends() 패턴 허용
 reportCallInDefaultInitializer = false
+# SQLAlchemy Row[Any] 전파 — 라이브러리 내부 Any 타입
+reportAny = false
+# authlib 타입 스텁 미제공
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+# SQLModel model_config 등 클래스 속성
+reportUnannotatedClassAttribute = false
+# Select[Any] 등 불가피한 Any 선언
+reportExplicitAny = false

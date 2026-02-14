@@ -1,3 +1,5 @@
+from typing import override
+
 from openai import AsyncOpenAI
 
 from src.config import get_settings
@@ -37,6 +39,7 @@ class OpenAIClient(BaseLLMClient):
         )
         self.client = AsyncOpenAI(api_key=resolved_key)
 
+    @override
     async def generate(
         self,
         system_instruction: str,
@@ -60,6 +63,7 @@ class OpenAIClient(BaseLLMClient):
             return False
         return not (model_lower.endswith("-pro") or "-pro-" in model_lower)
 
+    @override
     async def list_models(self) -> list[ModelInfo]:
         """텍스트 생성용 모델 목록 조회 (최신순 정렬)."""
         response = await self.client.models.list()

@@ -1,6 +1,6 @@
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from anthropic.types import TextBlock
 
 from src.llm.base import BaseLLMClient

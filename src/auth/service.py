@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from joserfc import jwt as jose_jwt
@@ -160,10 +160,10 @@ async def migrate_guest_to_user(
     ]:
         result = await session.execute(
             update(model)
-            .where(col(model.guest_id) == guest_id)  # type: ignore[arg-type]
+            .where(col(model.guest_id) == guest_id)  # type: ignore[attr-defined]
             .values(user_id=user_id, guest_id=None)
         )
-        cursor_result = cast(CursorResult, result)
+        cursor_result = cast("CursorResult[Any]", result)
         counts[key] = cursor_result.rowcount
 
     guest_result = await session.execute(select(Guest).where(col(Guest.id) == guest_id))

@@ -1,12 +1,10 @@
 import logging
 import re
-from typing import Never
 
 from src.common.types import (
     ConstraintType,
     ContainsConstraint,
     LogicConstraint,
-    MaxLengthConstraint,
     NotContainsConstraint,
     RangeConstraint,
     RegexConstraint,
@@ -80,11 +78,7 @@ def _check_constraint(
     if isinstance(constraint, RegexConstraint):
         return _check_regex(value, constraint.pattern)
 
-    if isinstance(constraint, MaxLengthConstraint):
-        return _check_max_length(value, constraint.max)
-
-    _: Never = constraint
-    raise ValueError(f"Unknown constraint type: {constraint}")
+    return _check_max_length(value, constraint.max)
 
 
 def _check_contains(value: FieldValue, expected: str) -> ConstraintResult:
