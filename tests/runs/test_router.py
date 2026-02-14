@@ -26,6 +26,7 @@ async def test_create_run_returns_201_and_running_status(
             "promptVersionId": version.id,
             "datasetId": dataset.id,
             "profileId": profile.id,
+            "apiKey": "test-key",
         },
     )
 
@@ -109,6 +110,61 @@ async def test_create_run_with_other_user_resource_returns_404(
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_run_with_empty_dataset_returns_400(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """빈 데이터셋(행이 0개)으로 Run 생성 시 400."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id)
+    profile = await profile_factory(guest_id)
+
+    response = await client.post(
+        "/runs",
+        json={
+            "promptVersionId": version.id,
+            "datasetId": dataset.id,
+            "profileId": profile.id,
+            "apiKey": "test-key",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "비어 있습니다" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_run_without_api_key_returns_400(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """API Key 없이 Run 생성 시 400."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id, rows=[{"input": {"test": "data"}}])
+    profile = await profile_factory(guest_id)
+
+    response = await client.post(
+        "/runs",
+        json={
+            "promptVersionId": version.id,
+            "datasetId": dataset.id,
+            "profileId": profile.id,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "API Key" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
