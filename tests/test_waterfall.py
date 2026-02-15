@@ -146,6 +146,29 @@ class TestWaterfallLabel:
         assert result.status == ResultStatus.PASS
 
 
+class TestWaterfallSemanticApiError:
+    """Semantic API 에러 시 fail-fast"""
+
+    @patch("src.runs.evaluator.semantic_layer.get_embedding")
+    def test_waterfall_semantic_api_error_returns_semantic_status(self, mock_embedding):
+        """임베딩 API 예외 시 SEMANTIC 상태 반환"""
+        mock_embedding.side_effect = Exception("API connection timeout")
+
+        result = evaluate_waterfall(
+            raw_output='{"verdict": "TRUE"}',
+            output_schema=OutputSchemaType.JSON_OBJECT,
+            expected_output='{"verdict": "TRUE"}',
+            threshold=0.8,
+            constraints=[],
+        )
+
+        assert result.status == ResultStatus.SEMANTIC
+        assert result.format_result.passed is True
+        assert result.semantic_result is not None
+        assert result.semantic_result.passed is False
+        assert result.semantic_result.error_message is not None
+
+
 class TestReEvaluateFromStored:
     """re_evaluate_from_stored 4개 분기 테스트"""
 
