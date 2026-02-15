@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from src.common.types import ContainsConstraint
 from src.prompts.models import OutputSchemaType
-from src.runs.evaluator.waterfall import evaluate_waterfall
+from src.runs.evaluator.waterfall import evaluate_waterfall, re_evaluate_from_stored
 from src.runs.models import ResultStatus
 
 
@@ -144,3 +144,69 @@ class TestWaterfallLabel:
         assert result.semantic_result is not None
         assert result.semantic_result.semantic_score == 1.0
         assert result.status == ResultStatus.PASS
+
+
+class TestReEvaluateFromStored:
+    """re_evaluate_from_stored 4개 분기 테스트"""
+
+    def test_re_evaluate_format_failed_returns_format(self):
+        """is_format_passed=False → FORMAT 즉시 반환"""
+        status, constraint_result = re_evaluate_from_stored(
+            is_format_passed=False,
+            parsed_output=None,
+            semantic_score=0.9,
+            threshold=0.8,
+            constraints=[],
+        )
+
+        assert status == ResultStatus.FORMAT
+        assert constraint_result is None
+
+    def test_re_evaluate_semantic_below_threshold_returns_semantic(self):
+        """score < threshold → SEMANTIC"""
+        status, constraint_result = re_evaluate_from_stored(
+            is_format_passed=True,
+            parsed_output={"verdict": "TRUE"},
+            semantic_score=0.5,
+            threshold=0.8,
+            constraints=[],
+        )
+
+        assert status == ResultStatus.SEMANTIC
+        assert constraint_result is None
+
+    def test_re_evaluate_constraint_fail_returns_constraint(self):
+        """constraint 실패 → CONSTRAINT + 결과"""
+        constraints = [
+            ContainsConstraint(type="contains", target="verdict", value="TRUE")
+        ]
+
+        status, constraint_result = re_evaluate_from_stored(
+            is_format_passed=True,
+            parsed_output={"verdict": "FALSE"},
+            semantic_score=0.9,
+            threshold=0.8,
+            constraints=constraints,
+        )
+
+        assert status == ResultStatus.CONSTRAINT
+        assert constraint_result is not None
+        assert constraint_result.passed is False
+
+    def test_re_evaluate_all_pass_returns_pass(self):
+        """전부 통과 → PASS + constraint 결과"""
+        constraints = [
+            ContainsConstraint(type="contains", target="verdict", value="TRUE")
+        ]
+
+        status, constraint_result = re_evaluate_from_stored(
+            is_format_passed=True,
+            parsed_output={"verdict": "TRUE"},
+            semantic_score=0.9,
+            threshold=0.8,
+            constraints=constraints,
+        )
+
+        assert status == ResultStatus.PASS
+        assert constraint_result is not None
+        assert constraint_result.passed is True
