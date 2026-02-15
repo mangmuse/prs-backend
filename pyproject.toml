@@ -76,6 +76,14 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = ["if __name__", "pragma: no cover"]
+
 [tool.basedpyright]
 pythonVersion = "3.12"
 venvPath = "."
