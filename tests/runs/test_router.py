@@ -562,3 +562,48 @@ async def test_re_evaluate_other_user_returns_404(
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_run_empty_results(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """결과 없는 run 재평가 시 빈 결과와 passRate 0.0."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(guest_id)
+    profile = await profile_factory(guest_id)
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.8,
+                "global_constraints": [],
+            },
+            status=RunStatus.COMPLETED,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        run_id = run.id
+
+    response = await client.post(
+        f"/runs/{run_id}/re-evaluate",
+        json={
+            "semanticThreshold": 0.85,
+            "globalConstraints": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["results"] == []
+    assert data["passRate"] == 0.0

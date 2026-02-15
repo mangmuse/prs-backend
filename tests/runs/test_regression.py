@@ -148,3 +148,80 @@ async def test_compare_runs_returns_row_comparisons(
     assert "targetStatus" in row1
     assert "baseSemanticScore" in row1
     assert "targetSemanticScore" in row1
+
+
+@pytest.mark.asyncio
+async def test_compare_runs_different_datasets(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """서로 다른 데이터셋 비교 시 빈 공통 rows."""
+    from unittest.mock import AsyncMock, patch
+
+    from src.runs.models import Run, RunStatus
+    from src.runs.service import execute_run
+
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    profile = await profile_factory(guest_id, semantic_threshold=0.7)
+
+    dataset_a = await dataset_factory(
+        guest_id,
+        name="데이터셋A",
+        rows=[{"input": {"claim": "주장A"}, "expected": "TRUE"}],
+    )
+    dataset_b = await dataset_factory(
+        guest_id,
+        name="데이터셋B",
+        rows=[{"input": {"claim": "주장B"}, "expected": "FALSE"}],
+    )
+
+    async with test_session_factory() as session:
+        run_a = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset_a.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.7,
+                "global_constraints": [],
+            },
+            status=RunStatus.RUNNING,
+        )
+        run_b = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset_b.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.7,
+                "global_constraints": [],
+            },
+            status=RunStatus.RUNNING,
+        )
+        session.add(run_a)
+        session.add(run_b)
+        await session.commit()
+        await session.refresh(run_a)
+        await session.refresh(run_b)
+        run_a_id = run_a.id
+        run_b_id = run_b.id
+
+    mock_llm = AsyncMock()
+    mock_llm.generate = AsyncMock(side_effect=["TRUE", "FALSE"])
+
+    with (
+        patch("src.runs.service.async_session", test_session_factory),
+        patch("src.runs.service.get_llm_client", return_value=mock_llm),
+    ):
+        await execute_run(run_a_id)
+        await execute_run(run_b_id)
+
+    response = await client.get(f"/runs/{run_b_id}/compare/{run_a_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["rowComparisons"] == []
+    assert data["pValue"] == 1.0
