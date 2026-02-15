@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
+import pytest
+
 from src.prompts.models import OutputSchemaType
-from src.runs.evaluator.semantic_layer import check_semantic
+from src.runs.evaluator.semantic_layer import check_semantic, cosine_similarity
 
 EMBEDDING_PATH = "src.runs.evaluator.semantic_layer.get_embedding"
 
@@ -95,3 +97,18 @@ class TestCheckSemanticLabelSkip:
         assert result.passed is True
         assert result.semantic_score == 1.0
         mock_get_embedding.assert_not_called()
+
+
+class TestCosineSimilarity:
+    """cosine_similarity 직접 테스트"""
+
+    def test_cosine_similarity_zero_vector_returns_zero(self):
+        """제로 벡터 시 0.0 반환"""
+        result = cosine_similarity([0.0, 0.0, 0.0], [1.0, 2.0, 3.0])
+
+        assert result == 0.0
+
+    def test_cosine_similarity_known_vectors(self):
+        """알려진 벡터 쌍으로 계산 정확도 검증"""
+        assert cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+        assert cosine_similarity([1.0, 1.0], [1.0, 1.0]) == pytest.approx(1.0)
