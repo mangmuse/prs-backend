@@ -4,7 +4,6 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import Request
-
 from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
