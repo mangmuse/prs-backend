@@ -61,6 +61,10 @@ async def test_run_성공_플로우_json_object(
     with (
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
+        patch(
+            "src.runs.evaluator.semantic_layer.get_embedding",
+            return_value=[1.0, 0.0, 0.0],
+        ),
     ):
         await execute_run(run_id)
 

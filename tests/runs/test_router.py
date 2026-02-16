@@ -1,5 +1,7 @@
 """runs router 테스트 - HTTP 계층만 검증."""
 
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
@@ -20,15 +22,16 @@ async def test_create_run_returns_201_and_running_status(
     dataset = await dataset_factory(guest_id, rows=[{"input": {"test": "data"}}])
     profile = await profile_factory(guest_id)
 
-    response = await client.post(
-        "/runs",
-        json={
-            "promptVersionId": version.id,
-            "datasetId": dataset.id,
-            "profileId": profile.id,
-            "apiKey": "test-key",
-        },
-    )
+    with patch("src.runs.router.process_run_task"):
+        response = await client.post(
+            "/runs",
+            json={
+                "promptVersionId": version.id,
+                "datasetId": dataset.id,
+                "profileId": profile.id,
+                "apiKey": "test-key",
+            },
+        )
 
     assert response.status_code == 201
     data = response.json()
@@ -239,6 +242,10 @@ async def test_list_runs_includes_layer_metrics(
     with (
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
+        patch(
+            "src.runs.evaluator.semantic_layer.get_embedding",
+            return_value=[1.0, 0.0, 0.0],
+        ),
     ):
         await execute_run(run_id)
 
@@ -305,6 +312,10 @@ async def test_get_run_detail_includes_layer_metrics(
     with (
         patch("src.runs.service.async_session", test_session_factory),
         patch("src.runs.service.get_llm_client", return_value=mock_llm),
+        patch(
+            "src.runs.evaluator.semantic_layer.get_embedding",
+            return_value=[1.0, 0.0, 0.0],
+        ),
     ):
         await execute_run(run_id)
 

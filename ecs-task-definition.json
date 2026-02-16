@@ -5,7 +5,6 @@
   "cpu": "256",
   "memory": "512",
   "executionRoleArn": "arn:aws:iam::271071983060:role/prs-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::271071983060:role/prs-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "prs-backend",
