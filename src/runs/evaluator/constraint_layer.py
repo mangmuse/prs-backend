@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Mapping, Sequence
 
 from src.common.types import (
     ConstraintType,
@@ -17,8 +18,8 @@ FieldValue = str | int | float | bool | None
 
 
 def check_constraints(
-    parsed_output: dict[str, FieldValue],
-    constraints: list[LogicConstraint],
+    parsed_output: Mapping[str, FieldValue],
+    constraints: Sequence[LogicConstraint],
 ) -> ConstraintLayerResult:
     """Constraint Layer: constraint 기반 규칙 검증"""
     logger.debug("Constraint 검증 시작 | constraints=%d개", len(constraints))

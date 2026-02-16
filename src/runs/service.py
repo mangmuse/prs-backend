@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -94,7 +95,7 @@ async def create_run(
 
 def assemble_prompt(
     user_template: str,
-    input_data: dict[str, JsonValue],
+    input_data: Mapping[str, JsonValue],
 ) -> str:
     """
     user_template의 {{key}}를 input_data[key]로 치환.
@@ -129,7 +130,7 @@ async def _process_single_row(
     version: PromptVersion,
     llm: LLMClient,
     threshold: float,
-    constraints: list[LogicConstraint],
+    constraints: Sequence[LogicConstraint],
 ) -> RunResult:
     """단일 row 처리 (LLM 호출 + 평가). 예외 발생 시 상위에서 처리."""
     assert row.id is not None

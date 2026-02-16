@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping, Sequence
 
 from src.common.types import LogicConstraint
 from src.prompts.models import OutputSchemaType
@@ -20,7 +21,7 @@ def evaluate_waterfall(
     output_schema: OutputSchemaType,
     expected_output: str,
     threshold: float,
-    constraints: list[LogicConstraint],
+    constraints: Sequence[LogicConstraint],
 ) -> WaterfallResult:
     """3-Layer Waterfall 평가 (fail-fast)"""
     logger.info(
@@ -102,10 +103,10 @@ def _get_parsed_output(format_result: FormatCheckResult) -> dict[str, FieldValue
 
 def re_evaluate_from_stored(
     is_format_passed: bool,
-    parsed_output: dict[str, FieldValue] | None,
+    parsed_output: Mapping[str, FieldValue] | None,
     semantic_score: float,
     threshold: float,
-    constraints: list[LogicConstraint],
+    constraints: Sequence[LogicConstraint],
 ) -> tuple[ResultStatus, ConstraintLayerResult | None]:
     """저장된 결과로 재평가 (LLM 호출 없이).
 
