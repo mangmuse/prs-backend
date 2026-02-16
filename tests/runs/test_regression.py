@@ -87,6 +87,7 @@ async def test_compare_runs_returns_row_comparisons(
         await session.commit()
         await session.refresh(run1)
         run1_id = run1.id
+        assert run1_id is not None
 
     mock_llm1 = AsyncMock()
     mock_llm1.generate = AsyncMock(side_effect=["TRUE", "FALSE"])
@@ -121,6 +122,7 @@ async def test_compare_runs_returns_row_comparisons(
         await session.commit()
         await session.refresh(run2)
         run2_id = run2.id
+        assert run2_id is not None
 
     mock_llm2 = AsyncMock()
     mock_llm2.generate = AsyncMock(side_effect=["FALSE", "FALSE"])
@@ -208,6 +210,8 @@ async def test_compare_runs_different_datasets(
         await session.refresh(run_b)
         run_a_id = run_a.id
         run_b_id = run_b.id
+        assert run_a_id is not None
+        assert run_b_id is not None
 
     mock_llm = AsyncMock()
     mock_llm.generate = AsyncMock(side_effect=["TRUE", "FALSE"])

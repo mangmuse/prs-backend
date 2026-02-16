@@ -98,6 +98,7 @@ class TestProcessRun:
             await session.commit()
             await session.refresh(run)
             run_id = run.id
+            assert run_id is not None
 
         mock_llm = AsyncMock()
         mock_llm.generate = AsyncMock(return_value="TRUE")
@@ -175,6 +176,7 @@ class TestProcessRun:
             await session.commit()
             await session.refresh(run)
             run_id = run.id
+            assert run_id is not None
 
         mock_llm = AsyncMock()
         mock_llm.generate = AsyncMock(return_value="완전히 다른 응답")
@@ -245,6 +247,7 @@ class TestProcessRun:
             await session.commit()
             await session.refresh(run)
             run_id = run.id
+            assert run_id is not None
 
         mock_llm = AsyncMock()
         mock_llm.generate = AsyncMock(return_value="이것은 JSON이 아닙니다")
@@ -317,6 +320,7 @@ class TestProcessRun:
             await session.commit()
             await session.refresh(run)
             run_id = run.id
+            assert run_id is not None
 
         mock_llm = AsyncMock()
         mock_llm.generate = AsyncMock(side_effect=["A", "B", "C"])
@@ -387,6 +391,7 @@ class TestProcessRun:
             await session.commit()
             await session.refresh(run)
             run_id = run.id
+            assert run_id is not None
 
         mock_llm = AsyncMock()
         mock_llm.generate = AsyncMock(side_effect=Exception("API Error"))

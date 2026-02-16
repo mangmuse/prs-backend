@@ -231,6 +231,7 @@ async def test_list_runs_includes_layer_metrics(
         await session.commit()
         await session.refresh(run)
         run_id = run.id
+        assert run_id is not None
 
     mock_llm = AsyncMock()
     mock_llm.generate = AsyncMock(side_effect=["TRUE", "FALSE"])
@@ -296,6 +297,7 @@ async def test_get_run_detail_includes_layer_metrics(
         await session.commit()
         await session.refresh(run)
         run_id = run.id
+        assert run_id is not None
 
     mock_llm = AsyncMock()
     mock_llm.generate = AsyncMock(return_value="TRUE")
@@ -473,6 +475,7 @@ async def test_re_evaluate_returns_200_with_results(
         await session.commit()
         await session.refresh(run)
         run_id = run.id
+        assert run_id is not None
 
     mock_llm = AsyncMock()
     mock_llm.generate = AsyncMock(side_effect=["TRUE", "FALSE"])

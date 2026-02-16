@@ -2,6 +2,7 @@
 
 import time
 from datetime import datetime
+from typing import Any
 
 import httpx
 
@@ -68,12 +69,13 @@ def create_dataset(client: httpx.Client, name: str) -> int:
 def add_row(
     client: httpx.Client,
     dataset_id: int,
-    input_data: dict,
-    expected_output: dict | str,
+    input_data: dict[str, Any],
+    expected_output: dict[str, Any] | list[str] | str,
     tags: list[str] | None = None,
 ) -> None:
     """데이터셋에 행 추가."""
     import json
+
     # expected_output이 dict 또는 list면 JSON 문자열로 변환
     if isinstance(expected_output, (dict, list)):
         expected_output = json.dumps(expected_output, ensure_ascii=False)
@@ -81,11 +83,13 @@ def add_row(
     # API는 배열을 기대함
     resp = client.post(
         f"{BASE_URL}/datasets/{dataset_id}/rows",
-        json=[{
-            "input_data": input_data,
-            "expected_output": expected_output,
-            "tags": tags or [],
-        }],
+        json=[
+            {
+                "input_data": input_data,
+                "expected_output": expected_output,
+                "tags": tags or [],
+            }
+        ],
     )
     resp.raise_for_status()
     created_count = resp.json()["created_count"]
@@ -96,7 +100,7 @@ def create_profile(
     client: httpx.Client,
     name: str,
     semantic_threshold: float = 0.75,
-    global_constraints: list[dict] | None = None,
+    global_constraints: list[dict[str, Any]] | None = None,
 ) -> int:
     """평가 프로필 생성."""
     resp = client.post(
@@ -142,14 +146,16 @@ def get_run_status(client: httpx.Client, run_id: int) -> str:
     raise ValueError(f"Run {run_id} not found")
 
 
-def get_run_detail(client: httpx.Client, run_id: int) -> dict:
+def get_run_detail(client: httpx.Client, run_id: int) -> dict[str, Any]:
     """Run 상세 조회."""
     resp = client.get(f"{BASE_URL}/runs/{run_id}")
     resp.raise_for_status()
     return resp.json()
 
 
-def wait_for_completion(client: httpx.Client, run_id: int, timeout: int = 60) -> dict:
+def wait_for_completion(
+    client: httpx.Client, run_id: int, timeout: int = 60
+) -> dict[str, Any]:
     """Run 완료 대기."""
     start = time.time()
     while time.time() - start < timeout:
@@ -163,7 +169,7 @@ def wait_for_completion(client: httpx.Client, run_id: int, timeout: int = 60) ->
     raise TimeoutError(f"Run {run_id} 타임아웃 ({timeout}초)")
 
 
-def print_results(run: dict) -> None:
+def print_results(run: dict[str, Any]) -> None:
     """결과 출력."""
     print("\n" + "=" * 60)
     print(f"Run ID: {run['id']}")
@@ -190,7 +196,7 @@ def print_results(run: dict) -> None:
 # =============================================================================
 
 
-def test_case_1_json_factcheck(client: httpx.Client) -> dict:
+def test_case_1_json_factcheck(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 1: JSON 팩트체크
     - output_schema: json_object
@@ -237,7 +243,7 @@ def test_case_1_json_factcheck(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_2_label(client: httpx.Client) -> dict:
+def test_case_2_label(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 2: Label 분류
     - output_schema: label
@@ -284,7 +290,7 @@ def test_case_2_label(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_3_with_constraints(client: httpx.Client) -> dict:
+def test_case_3_with_constraints(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 3: Logic Constraints 검증
     - contains, range 제약조건
@@ -306,7 +312,9 @@ def test_case_3_with_constraints(client: httpx.Client) -> dict:
     add_row(
         client,
         dataset_id,
-        {"content": "인공지능은 컴퓨터 과학의 한 분야로, 기계가 인간처럼 학습하고 문제를 해결할 수 있게 하는 기술입니다."},
+        {
+            "content": "인공지능은 컴퓨터 과학의 한 분야로, 기계가 인간처럼 학습하고 문제를 해결할 수 있게 하는 기술입니다."
+        },
         {"summary": "인공지능은 기계가 학습하고 문제를 해결하는 기술입니다."},
     )
 
@@ -325,7 +333,7 @@ def test_case_3_with_constraints(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_4_freeform(client: httpx.Client) -> dict:
+def test_case_4_freeform(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 4: Freeform (자유 형식)
     - Format 검증 스킵
@@ -357,7 +365,7 @@ def test_case_4_freeform(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_5_json_array(client: httpx.Client) -> dict:
+def test_case_5_json_array(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 5: JSON Array
     - output_schema: json_array
@@ -392,7 +400,7 @@ def test_case_5_json_array(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_6_logic_contains(client: httpx.Client) -> dict:
+def test_case_6_logic_contains(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 6: Logic contains 제약
     - 특정 문자열 포함 검증
@@ -434,7 +442,7 @@ def test_case_6_logic_contains(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_7_logic_range(client: httpx.Client) -> dict:
+def test_case_7_logic_range(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 7: Logic range 제약
     - 숫자 범위 검증
@@ -464,9 +472,7 @@ def test_case_7_logic_range(client: httpx.Client) -> dict:
         client,
         "Range-0.5",
         semantic_threshold=0.5,
-        global_constraints=[
-            {"type": "range", "field": "score", "min": 1, "max": 10}
-        ],
+        global_constraints=[{"type": "range", "field": "score", "min": 1, "max": 10}],
     )
 
     run_id = create_run(client, version_id, dataset_id, profile_id)
@@ -475,7 +481,7 @@ def test_case_7_logic_range(client: httpx.Client) -> dict:
     return run
 
 
-def test_case_8_logic_regex(client: httpx.Client) -> dict:
+def test_case_8_logic_regex(client: httpx.Client) -> dict[str, Any]:
     """
     케이스 8: Logic regex 제약
     - 정규식 패턴 검증
@@ -529,7 +535,9 @@ def main():
         results = []
 
         try:
-            results.append(("케이스1: JSON 팩트체크", test_case_1_json_factcheck(client)))
+            results.append(
+                ("케이스1: JSON 팩트체크", test_case_1_json_factcheck(client))
+            )
         except Exception as e:
             log(f"❌ 케이스1 실패: {e}")
             results.append(("케이스1: JSON 팩트체크", {"error": str(e)}))
@@ -541,7 +549,9 @@ def main():
             results.append(("케이스2: Label 감정분석", {"error": str(e)}))
 
         try:
-            results.append(("케이스3: Constraints", test_case_3_with_constraints(client)))
+            results.append(
+                ("케이스3: Constraints", test_case_3_with_constraints(client))
+            )
         except Exception as e:
             log(f"❌ 케이스3 실패: {e}")
             results.append(("케이스3: Constraints", {"error": str(e)}))
@@ -559,7 +569,9 @@ def main():
             results.append(("케이스5: JSON Array", {"error": str(e)}))
 
         try:
-            results.append(("케이스6: Logic contains", test_case_6_logic_contains(client)))
+            results.append(
+                ("케이스6: Logic contains", test_case_6_logic_contains(client))
+            )
         except Exception as e:
             log(f"❌ 케이스6 실패: {e}")
             results.append(("케이스6: Logic contains", {"error": str(e)}))
@@ -586,7 +598,9 @@ def main():
             else:
                 status = run.get("status", "unknown")
                 pass_rate = run.get("pass_rate", "N/A")
-                print(f"{'✅' if status == 'completed' else '⚠️'} {name}: {status}, pass_rate={pass_rate}")
+                print(
+                    f"{'✅' if status == 'completed' else '⚠️'} {name}: {status}, pass_rate={pass_rate}"
+                )
 
 
 if __name__ == "__main__":

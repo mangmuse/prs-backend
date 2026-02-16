@@ -54,6 +54,7 @@ async def test_run_성공_플로우_json_object(
         await session.commit()
         await session.refresh(run)
         run_id = run.id
+        assert run_id is not None
 
     mock_llm = MockLLMClient('{"verdict": "TRUE", "confidence": 0.95}')
 
@@ -127,6 +128,7 @@ async def test_run_semantic_실패_플로우(
         await session.commit()
         await session.refresh(run)
         run_id = run.id
+        assert run_id is not None
 
     mock_llm = MockLLMClient('{"verdict": "FALSE", "reason": "잘못된 판단"}')
 

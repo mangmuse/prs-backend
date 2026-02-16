@@ -255,6 +255,7 @@ class TestCheckConstraintsRangeEdgeCases:
         result = check_constraints(parsed_output, constraints)
 
         assert result.passed is False
+        assert result.results[0].message is not None
         assert "숫자가 아닌 값" in result.results[0].message
 
 
@@ -315,6 +316,7 @@ class TestCheckConstraintsMiscEdgeCases:
         result = check_constraints(parsed_output, constraints)
 
         assert result.passed is False
+        assert result.results[0].message is not None
         assert "잘못된 정규식" in result.results[0].message
 
     def test_constraint_none_value_in_field_fails(self):
@@ -325,4 +327,5 @@ class TestCheckConstraintsMiscEdgeCases:
         result = check_constraints(parsed_output, constraints)
 
         assert result.passed is False
+        assert result.results[0].message is not None
         assert "숫자가 아닌 값" in result.results[0].message

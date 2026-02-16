@@ -189,7 +189,7 @@ def profile_factory(
                 guest_id=guest_uuid,
                 name=name,
                 semantic_threshold=semantic_threshold,
-                global_constraints=global_constraints,
+                global_constraints=global_constraints or [],
             )
             session.add(profile)
             await session.commit()
