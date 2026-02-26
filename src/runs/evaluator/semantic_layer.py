@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from openai import OpenAI
 
+from src.config import get_settings
 from src.prompts.models import OutputSchemaType
 from src.runs.schemas import SemanticCheckResult
 
@@ -14,7 +15,8 @@ _client: OpenAI | None = None
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        _client = OpenAI()
+        settings = get_settings()
+        _client = OpenAI(api_key=settings.OPENAI_API_KEY)
     return _client
 
 
