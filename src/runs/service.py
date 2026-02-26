@@ -420,7 +420,10 @@ async def get_run_detail(
 
     results = all_results
     if status is not None:
-        results = [r for r in results if r.status.value == status]
+        if status == "fail":
+            results = [r for r in results if r.status != ResultStatus.PASS]
+        else:
+            results = [r for r in results if r.status.value == status]
     if cursor is not None:
         results = [r for r in results if r.id is not None and r.id > cursor]
 
@@ -430,13 +433,15 @@ async def get_run_detail(
         results = results[:limit]
         next_cursor = results[-1].id if has_next and results else None
 
+    original_index = {r.id: idx for idx, r in enumerate(all_results, 1)}
+
     result_responses: list[RunResultResponse] = []
-    for idx, r in enumerate(results, 1):
+    for r in results:
         assert r.id is not None
         result_responses.append(
             RunResultResponse(
                 id=r.id,
-                row_index=idx,
+                row_index=original_index[r.id],
                 dataset_row_id=r.dataset_row_id,
                 input_snapshot=r.input_snapshot,
                 expected_snapshot=r.expected_snapshot,
