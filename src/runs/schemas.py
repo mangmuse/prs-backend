@@ -219,3 +219,4 @@ class ReEvaluateResponse(CamelCaseModel):
 
     results: list[ReEvaluatedRow]
     pass_rate: float
+    status_counts: dict[str, int]

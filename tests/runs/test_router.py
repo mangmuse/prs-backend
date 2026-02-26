@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from src.runs.models import Run, RunStatus
+from src.runs.models import Run, RunResult, RunStatus
 
 
 @pytest.mark.asyncio
@@ -621,3 +621,111 @@ async def test_re_evaluate_run_empty_results(
     data = response.json()
     assert data["results"] == []
     assert data["passRate"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_response_includes_status_counts(
+    client: AsyncClient,
+    create_run_with_results,
+) -> None:
+    """재평가 응답에 statusCounts가 포함된다."""
+    run = await create_run_with_results(["pass", "pass", "format"])
+
+    response = await client.post(
+        f"/runs/{run.id}/re-evaluate",
+        json={
+            "semanticThreshold": 0.5,
+            "globalConstraints": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "statusCounts" in data
+    status_counts = data["statusCounts"]
+    assert isinstance(status_counts, dict)
+    assert "pass" in status_counts
+    assert "format" in status_counts
+    assert "semantic" in status_counts
+    assert "constraint" in status_counts
+
+
+@pytest.mark.asyncio
+async def test_re_evaluate_status_counts_reflect_re_evaluated_results(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    test_session_factory,
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+) -> None:
+    """statusCounts는 재채점 결과 기준으로 계산된다."""
+    guest_id = guest_cookies["guest_id"]
+    _, version = await prompt_factory(guest_id)
+    dataset = await dataset_factory(
+        guest_id,
+        rows=[
+            {"input": {"text": "row_0"}, "expected": "ok"},
+            {"input": {"text": "row_1"}, "expected": "ok"},
+            {"input": {"text": "row_2"}, "expected": "ok"},
+        ],
+    )
+
+    profile = await profile_factory(guest_id)
+
+    detail = await client.get(f"/datasets/{dataset.id}")
+    row_ids = [r["id"] for r in detail.json()["rows"]]
+
+    async with test_session_factory() as session:
+        run = Run(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            profile_snapshot={
+                "semantic_threshold": 0.8,
+                "global_constraints": [],
+            },
+            status=RunStatus.COMPLETED,
+            guest_id=guest_id,
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+
+        results_data = [
+            (row_ids[0], True, 0.9, "pass"),
+            (row_ids[1], True, 0.3, "pass"),
+            (row_ids[2], False, 0.9, "pass"),
+        ]
+        for row_id, is_format_passed, semantic_score, status in results_data:
+            session.add(
+                RunResult(
+                    run_id=run.id,
+                    dataset_row_id=row_id,
+                    input_snapshot={"text": "test"},
+                    expected_snapshot="ok",
+                    assembled_prompt={"system_instruction": "s", "user_message": "u"},
+                    raw_output="ok",
+                    is_format_passed=is_format_passed,
+                    semantic_score=semantic_score,
+                    status=status,
+                )
+            )
+        await session.commit()
+        run_id = run.id
+
+    response = await client.post(
+        f"/runs/{run_id}/re-evaluate",
+        json={
+            "semanticThreshold": 0.5,
+            "globalConstraints": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    status_counts = data["statusCounts"]
+    assert status_counts["pass"] == 1
+    assert status_counts["semantic"] == 1
+    assert status_counts["format"] == 1
+    assert status_counts["constraint"] == 0

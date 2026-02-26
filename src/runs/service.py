@@ -654,4 +654,15 @@ async def re_evaluate_run(
     total = len(results)
     pass_rate = (pass_count / total) if total else 0.0
 
-    return ReEvaluateResponse(results=re_evaluated, pass_rate=pass_rate)
+    status_counts: dict[str, int] = {
+        "pass": 0,
+        "format": 0,
+        "semantic": 0,
+        "constraint": 0,
+    }
+    for row in re_evaluated:
+        status_counts[row.status.value] = status_counts.get(row.status.value, 0) + 1
+
+    return ReEvaluateResponse(
+        results=re_evaluated, pass_rate=pass_rate, status_counts=status_counts
+    )
