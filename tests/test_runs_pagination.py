@@ -7,46 +7,10 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_pagination_returns_limited_results_with_cursor(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """cursor와 limit를 전달하면 해당 범위의 결과만 반환한다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(5)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_id,
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": "pass",
-            }
-            for i, row_id in enumerate(row_ids)
-        ],
-    )
+    run = await create_run_with_results(["pass"] * 5)
 
     resp = await client.get(f"/runs/{run.id}?limit=2")
     assert resp.status_code == 200
@@ -70,46 +34,10 @@ async def test_pagination_returns_limited_results_with_cursor(
 @pytest.mark.asyncio
 async def test_no_cursor_or_limit_returns_all_results(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """cursor/limit 없이 호출하면 전체 결과를 반환한다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(5)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_id,
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": "pass",
-            }
-            for i, row_id in enumerate(row_ids)
-        ],
-    )
+    run = await create_run_with_results(["pass"] * 5)
 
     resp = await client.get(f"/runs/{run.id}")
     assert resp.status_code == 200
@@ -122,47 +50,10 @@ async def test_no_cursor_or_limit_returns_all_results(
 @pytest.mark.asyncio
 async def test_response_includes_status_counts(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """응답에 statusCounts가 전체 기준으로 포함된다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(4)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    statuses = ["pass", "pass", "format", "semantic"]
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_ids[i],
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": statuses[i],
-            }
-            for i in range(4)
-        ],
-    )
+    run = await create_run_with_results(["pass", "pass", "format", "semantic"])
 
     resp = await client.get(f"/runs/{run.id}")
     assert resp.status_code == 200
@@ -178,47 +69,10 @@ async def test_response_includes_status_counts(
 @pytest.mark.asyncio
 async def test_status_filter_returns_only_matching_results(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """status 필터를 전달하면 해당 status의 결과만 페이지네이션한다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(5)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    statuses = ["pass", "format", "pass", "semantic", "pass"]
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_ids[i],
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": statuses[i],
-            }
-            for i in range(5)
-        ],
-    )
+    run = await create_run_with_results(["pass", "format", "pass", "semantic", "pass"])
 
     resp = await client.get(f"/runs/{run.id}?status=pass")
     assert resp.status_code == 200
@@ -231,47 +85,10 @@ async def test_status_filter_returns_only_matching_results(
 @pytest.mark.asyncio
 async def test_status_counts_always_reflect_all_results(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """status 필터와 무관하게 statusCounts는 전체 기준이다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(4)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    statuses = ["pass", "pass", "format", "semantic"]
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_ids[i],
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": statuses[i],
-            }
-            for i in range(4)
-        ],
-    )
+    run = await create_run_with_results(["pass", "pass", "format", "semantic"])
 
     resp = await client.get(f"/runs/{run.id}?status=pass")
     assert resp.status_code == 200
@@ -289,46 +106,10 @@ async def test_status_counts_always_reflect_all_results(
 @pytest.mark.asyncio
 async def test_next_cursor_is_null_on_last_page(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """nextCursor가 null이면 마지막 페이지이다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(3)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_ids[i],
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": "pass",
-            }
-            for i in range(3)
-        ],
-    )
+    run = await create_run_with_results(["pass"] * 3)
 
     resp = await client.get(f"/runs/{run.id}?limit=2")
     data = resp.json()
@@ -344,46 +125,10 @@ async def test_next_cursor_is_null_on_last_page(
 @pytest.mark.asyncio
 async def test_total_count_always_returns_all_results_count(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """totalCount는 항상 전체 결과 수를 반환한다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": f"row_{i}"}, "expected": "ok"} for i in range(5)],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    detail = await client.get(f"/datasets/{dataset.id}")
-    row_ids = [r["id"] for r in detail.json()["rows"]]
-
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-        results=[
-            {
-                "dataset_row_id": row_ids[i],
-                "input_snapshot": {"text": f"row_{i}"},
-                "expected_snapshot": "ok",
-                "assembled_prompt": {"system_instruction": "s", "user_message": "u"},
-                "raw_output": "ok",
-                "status": "pass",
-            }
-            for i in range(5)
-        ],
-    )
+    run = await create_run_with_results(["pass"] * 5)
 
     resp = await client.get(f"/runs/{run.id}?limit=2")
     assert resp.status_code == 200
@@ -396,32 +141,10 @@ async def test_total_count_always_returns_all_results_count(
 @pytest.mark.asyncio
 async def test_empty_results_returns_empty_array_and_null_cursor(
     client: AsyncClient,
-    guest_cookies: dict[str, str],
-    prompt_factory,
-    dataset_factory,
-    profile_factory,
-    run_factory,
+    create_run_with_results,
 ) -> None:
     """결과가 0건이면 빈 배열과 nextCursor=null을 반환한다."""
-    guest_id = guest_cookies["guest_id"]
-
-    prompt, version = await prompt_factory(guest_id)
-    dataset = await dataset_factory(
-        guest_id,
-        rows=[{"input": {"text": "row_0"}, "expected": "ok"}],
-    )
-    profile = await profile_factory(guest_id)
-
-    assert version.id is not None
-    assert dataset.id is not None
-    assert profile.id is not None
-
-    run = await run_factory(
-        prompt_version_id=version.id,
-        dataset_id=dataset.id,
-        profile_id=profile.id,
-        guest_id=guest_id,
-    )
+    run = await create_run_with_results()
 
     resp = await client.get(f"/runs/{run.id}")
     assert resp.status_code == 200

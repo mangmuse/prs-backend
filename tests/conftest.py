@@ -247,6 +247,71 @@ def run_factory(
     return _create
 
 
+@pytest.fixture
+def create_run_with_results(
+    client: AsyncClient,
+    guest_cookies: dict[str, str],
+    prompt_factory,
+    dataset_factory,
+    profile_factory,
+    run_factory,
+) -> Callable[..., Coroutine[Any, Any, Run]]:
+    """Run + 결과 일괄 생성 팩토리.
+
+    statuses=None → 결과 0건, statuses=["pass", "format", ...] → 해당 결과 포함.
+    """
+
+    async def _create(statuses: list[str] | None = None) -> Run:
+        guest_id = guest_cookies["guest_id"]
+        _, version = await prompt_factory(guest_id)
+
+        row_count = len(statuses) if statuses else 1
+        dataset = await dataset_factory(
+            guest_id,
+            rows=[
+                {"input": {"text": f"row_{i}"}, "expected": "ok"}
+                for i in range(row_count)
+            ],
+        )
+        profile = await profile_factory(guest_id)
+
+        assert version.id is not None
+        assert dataset.id is not None
+        assert profile.id is not None
+
+        detail = await client.get(f"/datasets/{dataset.id}")
+        row_ids = [r["id"] for r in detail.json()["rows"]]
+
+        results = (
+            [
+                {
+                    "dataset_row_id": row_ids[i],
+                    "input_snapshot": {"text": f"row_{i}"},
+                    "expected_snapshot": "ok",
+                    "assembled_prompt": {
+                        "system_instruction": "s",
+                        "user_message": "u",
+                    },
+                    "raw_output": "ok",
+                    "status": statuses[i],
+                }
+                for i in range(len(statuses))
+            ]
+            if statuses
+            else None
+        )
+
+        return await run_factory(
+            prompt_version_id=version.id,
+            dataset_id=dataset.id,
+            profile_id=profile.id,
+            guest_id=guest_id,
+            results=results,
+        )
+
+    return _create
+
+
 class MockLLMClient:
     """테스트용 Mock LLM 클라이언트."""
 
