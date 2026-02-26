@@ -373,6 +373,9 @@ async def get_run_detail(
     run_id: int,
     identity: Guest | User,
     session: AsyncSession,
+    cursor: int | None = None,
+    limit: int | None = None,
+    status: str | None = None,
 ) -> RunDetailResponse:
     """Run 상세 조회 (결과 및 통계 포함)."""
     repo = RunRepository(session)
@@ -390,21 +393,42 @@ async def get_run_detail(
     profile = await repo.get_profile_by_id(run.profile_id)
     assert profile is not None
 
-    results = await repo.get_results_by_run_id(run_id)
+    all_results = await repo.get_results_by_run_id(run_id)
 
     assert run.id is not None
     assert profile.id is not None
 
-    total = len(results)
-    pass_count = sum(1 for r in results if r.status == ResultStatus.PASS)
-    avg_semantic = sum(r.semantic_score for r in results) / total if total else 0.0
-    format_pass_count = sum(1 for r in results if r.is_format_passed)
+    total = len(all_results)
+    pass_count = sum(1 for r in all_results if r.status == ResultStatus.PASS)
+    avg_semantic = sum(r.semantic_score for r in all_results) / total if total else 0.0
+    format_pass_count = sum(1 for r in all_results if r.is_format_passed)
     semantic_pass_count = sum(
         1
-        for r in results
+        for r in all_results
         if r.status not in (ResultStatus.FORMAT, ResultStatus.SEMANTIC)
     )
     constraint_pass_count = pass_count
+
+    status_counts = {
+        "pass": sum(1 for r in all_results if r.status == ResultStatus.PASS),
+        "format": sum(1 for r in all_results if r.status == ResultStatus.FORMAT),
+        "semantic": sum(1 for r in all_results if r.status == ResultStatus.SEMANTIC),
+        "constraint": sum(
+            1 for r in all_results if r.status == ResultStatus.CONSTRAINT
+        ),
+    }
+
+    results = all_results
+    if status is not None:
+        results = [r for r in results if r.status.value == status]
+    if cursor is not None:
+        results = [r for r in results if r.id is not None and r.id > cursor]
+
+    next_cursor: int | None = None
+    if limit is not None:
+        has_next = len(results) > limit
+        results = results[:limit]
+        next_cursor = results[-1].id if has_next and results else None
 
     result_responses: list[RunResultResponse] = []
     for idx, r in enumerate(results, 1):
@@ -454,6 +478,9 @@ async def get_run_detail(
             constraint_pass_rate=(constraint_pass_count / total) if total else 0.0,
         ),
         results=result_responses,
+        next_cursor=next_cursor,
+        status_counts=status_counts,
+        total_count=total,
     )
 
 

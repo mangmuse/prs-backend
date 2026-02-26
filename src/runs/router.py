@@ -105,11 +105,16 @@ async def list_runs(
 @router.get("/{run_id}", response_model=RunDetailResponse)
 async def get_run(
     run_id: int,
+    cursor: int | None = None,
+    limit: int | None = None,
+    status: str | None = None,
     identity: Guest | User = Depends(get_current_identity),
     session: AsyncSession = Depends(get_session),
 ) -> RunDetailResponse:
     """Run 상세 조회."""
-    return await get_run_detail(run_id, identity, session)
+    return await get_run_detail(
+        run_id, identity, session, cursor=cursor, limit=limit, status=status
+    )
 
 
 @router.get("/{run_id}/related-versions", response_model=RelatedVersionsResponse)

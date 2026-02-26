@@ -152,6 +152,9 @@ class RunDetailResponse(CamelCaseModel):
     profile: ProfileInRun
     metrics: RunMetrics
     results: list[RunResultResponse]
+    next_cursor: int | None = None
+    status_counts: dict[str, int] | None = None
+    total_count: int | None = None
 
 
 class RelatedRunResponse(CamelCaseModel):
