@@ -102,6 +102,22 @@ async def list_runs(
     return await get_runs_summary(identity, session, grouped=grouped)
 
 
+@router.get("/{run_id}/status", response_model=RunCreateResponse)
+async def get_run_status(
+    run_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> RunCreateResponse:
+    """Run 상태 경량 조회."""
+    run = await get_user_run(run_id, identity, session)
+    assert run.id is not None
+    return RunCreateResponse(
+        id=run.id,
+        status=run.status.value,
+        created_at=run.created_at,
+    )
+
+
 @router.get("/{run_id}", response_model=RunDetailResponse)
 async def get_run(
     run_id: int,
