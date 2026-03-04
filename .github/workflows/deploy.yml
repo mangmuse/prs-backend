@@ -8,7 +8,7 @@ env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: prs-backend
   ECS_CLUSTER: prs-cluster
-  ECS_SERVICE: prs-backend-service
+  ECS_SERVICE: prs-backend-svc
 
 jobs:
   test:
