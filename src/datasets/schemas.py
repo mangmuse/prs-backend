@@ -99,3 +99,12 @@ class UpdateRowRequest(CamelCaseModel):
 
 class CreateRowsResponse(CamelCaseModel):
     created_count: int
+
+
+class CsvImportErrorDetail(CamelCaseModel):
+    row: int
+    reason: str
+
+
+class CsvImportResponse(CamelCaseModel):
+    created_count: int
