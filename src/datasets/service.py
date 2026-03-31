@@ -216,3 +216,18 @@ async def delete_row(
 
     await session.delete(row)
     await session.commit()
+
+
+async def get_all_rows(
+    dataset: Dataset,
+    session: AsyncSession,
+) -> list[DatasetRow]:
+    """데이터셋의 전체 행을 row_index 순으로 조회."""
+    assert dataset.id is not None
+    stmt = (
+        select(DatasetRow)
+        .where(col(DatasetRow.dataset_id) == dataset.id)
+        .order_by(col(DatasetRow.row_index))
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

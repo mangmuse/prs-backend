@@ -1,10 +1,13 @@
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_identity
 from src.auth.models import Guest, User
 from src.database import get_session
-from src.datasets import csv_parser, schemas, service
+from src.datasets import csv_exporter, csv_parser, schemas, service
 from src.datasets.dependencies import get_user_dataset
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -158,3 +161,32 @@ async def import_csv(
     created_count = await service.create_rows(dataset_id, row_requests, session)
 
     return schemas.CsvImportResponse(created_count=created_count)
+
+
+@router.get("/{dataset_id}/export-csv")
+async def export_csv(
+    dataset_id: int,
+    identity: Guest | User = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """데이터셋 전체 행을 CSV 파일로 내보내기."""
+    dataset = await get_user_dataset(dataset_id, identity, session)
+    rows = await service.get_all_rows(dataset, session)
+
+    row_dicts = [
+        {
+            "input_data": row.input_data,
+            "expected_output": row.expected_output,
+            "tags": row.tags,
+        }
+        for row in rows
+    ]
+
+    csv_content = csv_exporter.rows_to_csv(row_dicts)
+
+    encoded_name = quote(f"{dataset.name}.csv")
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}"},
+    )
