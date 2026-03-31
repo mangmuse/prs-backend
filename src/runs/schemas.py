@@ -147,6 +147,7 @@ class RunDetailResponse(CamelCaseModel):
     prompt_name: str
     version_number: int
     dataset_name: str
+    model: str
     status: str
     created_at: datetime
     profile: ProfileInRun

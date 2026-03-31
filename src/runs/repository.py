@@ -33,6 +33,7 @@ class RunDetailRow(NamedTuple):
     prompt_name: str
     version_number: int
     dataset_name: str
+    model: str
 
 
 class RunWithPromptIdRow(NamedTuple):
@@ -240,6 +241,7 @@ class RunRepository:
                 col(Prompt.name).label("prompt_name"),
                 col(PromptVersion.version_number).label("version_number"),
                 col(Dataset.name).label("dataset_name"),
+                col(PromptVersion.model).label("model"),
             )
             .join(PromptVersion, col(Run.prompt_version_id) == col(PromptVersion.id))
             .join(Prompt, col(PromptVersion.prompt_id) == col(Prompt.id))

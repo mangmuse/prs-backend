@@ -389,6 +389,7 @@ async def get_run_detail(
     prompt_name = row.prompt_name
     version_number = row.version_number
     dataset_name = row.dataset_name
+    model = row.model
 
     profile = await repo.get_profile_by_id(run.profile_id)
     assert profile is not None
@@ -467,6 +468,7 @@ async def get_run_detail(
         prompt_name=prompt_name,
         version_number=version_number,
         dataset_name=dataset_name,
+        model=model,
         status=run.status.value,
         created_at=run.created_at,
         profile=ProfileInRun(
