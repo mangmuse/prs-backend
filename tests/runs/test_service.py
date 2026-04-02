@@ -418,3 +418,72 @@ class TestProcessRun:
             ).scalar_one()
 
             assert run.status == RunStatus.FAILED
+
+
+class TestEmptyUserMessageValidation:
+    """빈 user_message로 LLM 호출 방지 테스트."""
+
+    @pytest.mark.asyncio
+    async def test_process_run_fails_with_empty_user_template(
+        self,
+        test_session_factory,
+        guest_factory,
+        prompt_factory,
+        dataset_factory,
+        profile_factory,
+    ) -> None:
+        """빈 user_template일 때 Run이 FAILED 상태가 되어야 한다."""
+        guest = await guest_factory()
+        guest_id = guest.id
+
+        _, version = await prompt_factory(
+            guest_id,
+            system_instruction="시스템 지시문",
+            user_template="",
+            output_schema=OutputSchemaType.FREEFORM,
+        )
+        dataset = await dataset_factory(
+            guest_id,
+            rows=[{"input": {"msg": "테스트"}, "expected": "응답"}],
+        )
+        profile = await profile_factory(guest_id)
+
+        async with test_session_factory() as session:
+            assert version.id is not None
+            assert dataset.id is not None
+            assert profile.id is not None
+
+            run = Run(
+                prompt_version_id=version.id,
+                dataset_id=dataset.id,
+                profile_id=profile.id,
+                profile_snapshot={
+                    "semantic_threshold": profile.semantic_threshold,
+                    "global_constraints": profile.global_constraints or [],
+                },
+                status=RunStatus.RUNNING,
+            )
+            session.add(run)
+            await session.commit()
+            await session.refresh(run)
+            run_id = run.id
+            assert run_id is not None
+
+        mock_llm = AsyncMock()
+        mock_llm.generate = AsyncMock(return_value="응답")
+
+        with (
+            patch("src.runs.service.async_session", test_session_factory),
+            patch("src.runs.service.get_llm_client", return_value=mock_llm),
+        ):
+            await execute_run(run_id)
+
+        async with test_session_factory() as session:
+            from sqlmodel import select
+
+            run = (
+                await session.execute(select(Run).where(Run.id == run_id))
+            ).scalar_one()
+
+            assert run.status == RunStatus.FAILED
+            mock_llm.generate.assert_not_called()

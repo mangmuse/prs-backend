@@ -138,6 +138,11 @@ async def _process_single_row(
 
     user_message = assemble_prompt(version.user_template, row.input_data)
 
+    if not user_message.strip():
+        raise ValueError(
+            "조립된 프롬프트가 비어있습니다. user_template을 확인해주세요."
+        )
+
     logger.debug(
         "LLM 호출 시작 | row_id=%d, model=%s, temperature=%.1f",
         row.id,

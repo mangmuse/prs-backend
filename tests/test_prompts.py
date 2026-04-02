@@ -262,3 +262,49 @@ async def test_access_other_user_prompt_returns_404(client: AsyncClient) -> None
     response = await client.get(f"/prompts/{prompt_id}/versions")
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_version_rejects_empty_user_template(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
+    """빈 user_template로 버전 생성 시 422 에러."""
+    prompt_resp = await client.post(
+        "/prompts",
+        json={"name": "빈 템플릿 테스트"},
+    )
+    prompt_id = prompt_resp.json()["id"]
+
+    response = await client.post(
+        f"/prompts/{prompt_id}/versions",
+        json={
+            "systemInstruction": "시스템 지시문",
+            "userTemplate": "",
+            "model": "gpt-4",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_version_rejects_whitespace_only_user_template(
+    client: AsyncClient, guest_cookies: dict[str, str]
+) -> None:
+    """공백만 있는 user_template로 버전 생성 시 422 에러."""
+    prompt_resp = await client.post(
+        "/prompts",
+        json={"name": "공백 템플릿 테스트"},
+    )
+    prompt_id = prompt_resp.json()["id"]
+
+    response = await client.post(
+        f"/prompts/{prompt_id}/versions",
+        json={
+            "systemInstruction": "시스템 지시문",
+            "userTemplate": "   ",
+            "model": "gpt-4",
+        },
+    )
+
+    assert response.status_code == 422

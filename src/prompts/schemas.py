@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 
 from src.common.schemas import CamelCaseModel
@@ -58,6 +58,13 @@ class CreateVersionRequest(CamelCaseModel):
     temperature: float = 1.0
     output_schema: OutputSchemaType = OutputSchemaType.JSON_OBJECT
     memo: str | None = None
+
+    @field_validator("user_template")
+    @classmethod
+    def user_template_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("유저 템플릿은 비어있을 수 없습니다")
+        return v
 
 
 class VersionSummary(CamelCaseModel):
