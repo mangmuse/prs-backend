@@ -1,5 +1,10 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlmodel import select
+
+from src.auth.service import find_or_create_user
+from src.profiles.models import EvaluatorProfile
 
 
 @pytest.mark.asyncio
@@ -55,3 +60,26 @@ async def test_nonexistent_guest_cookie_creates_new_guest(client: AsyncClient) -
     data = response.json()
     assert data["guestId"] != fake_uuid
     assert "guest_id" in response.cookies
+
+
+@pytest.mark.asyncio
+async def test_new_user_gets_default_profile(
+    test_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """신규 유저 생성 시 기본 평가 프로필이 자동 생성되어야 한다."""
+    async with test_session_factory() as session:
+        user = await find_or_create_user(
+            session=session,
+            email="test@example.com",
+            provider_id="google-123",
+            name="Test User",
+        )
+
+        result = await session.execute(
+            select(EvaluatorProfile).where(EvaluatorProfile.user_id == user.id)
+        )
+        profiles = result.scalars().all()
+
+        assert len(profiles) == 1
+        assert profiles[0].name == "기본 평가 프로필"
+        assert profiles[0].semantic_threshold == 0.75

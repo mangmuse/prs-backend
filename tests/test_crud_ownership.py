@@ -76,8 +76,9 @@ class TestListOwnershipIsolation:
 
         assert response.status_code == 200
         profiles = response.json()
-        assert len(profiles) == 1
-        assert profiles[0]["name"] == "A의 프로필"
+        profile_names = [p["name"] for p in profiles]
+        assert "A의 프로필" in profile_names
+        assert "B의 프로필" not in profile_names
 
 
 class TestCreateOwnershipAssignment:

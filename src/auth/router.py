@@ -21,6 +21,7 @@ from src.auth.schemas import (
 from src.common.exceptions import BadRequestError, NotFoundError, UnauthorizedError
 from src.config import get_settings
 from src.database import get_session
+from src.profiles.service import create_default_profile
 from src.redis import get_redis, retrieve_temp_code, store_temp_code
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -61,6 +62,9 @@ async def create_guest_session(
 
     guest = Guest()
     session.add(guest)
+    await session.flush()
+
+    _ = await create_default_profile(session, guest_id=guest.id)
     await session.commit()
     await session.refresh(guest)
 

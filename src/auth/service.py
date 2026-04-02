@@ -15,6 +15,7 @@ from src.auth.schemas import TokenPayload
 from src.config import get_settings
 from src.datasets.models import Dataset
 from src.profiles.models import EvaluatorProfile
+from src.profiles.service import create_default_profile
 from src.prompts.models import Prompt
 from src.runs.models import Run
 
@@ -136,6 +137,9 @@ async def find_or_create_user(
         picture_url=picture_url,
     )
     session.add(user)
+    await session.flush()
+
+    _ = await create_default_profile(session, user_id=user.id)
     await session.commit()
     await session.refresh(user)
     return user

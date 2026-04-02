@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
@@ -10,6 +12,32 @@ from src.profiles.schemas import (
     ProfileSummary,
     UpdateProfileRequest,
 )
+
+DEFAULT_PROFILE_NAME = "기본 평가 프로필"
+DEFAULT_PROFILE_DESCRIPTION = (
+    "예상 출력과 실제 출력의 의미적 유사도(cosine similarity)가 "
+    "0.75 이상일 때 통과로 판정합니다."
+)
+DEFAULT_SEMANTIC_THRESHOLD = 0.75
+
+
+async def create_default_profile(
+    session: AsyncSession,
+    *,
+    guest_id: UUID | None = None,
+    user_id: int | None = None,
+) -> EvaluatorProfile:
+    """기본 평가 프로필 생성."""
+    profile = EvaluatorProfile(
+        name=DEFAULT_PROFILE_NAME,
+        description=DEFAULT_PROFILE_DESCRIPTION,
+        semantic_threshold=DEFAULT_SEMANTIC_THRESHOLD,
+        global_constraints=[],
+        guest_id=guest_id,
+        user_id=user_id,
+    )
+    session.add(profile)
+    return profile
 
 
 async def create_profile(
